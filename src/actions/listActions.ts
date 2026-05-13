@@ -27,12 +27,18 @@ export function registerListActions(app: App) {
     const rem = reminderService.find(reminderId);
     if (!rem || rem.creator_slack_id !== userId) {
       logger.warn(`pause_reminder: unauthorized or not found (rem=${reminderId} user=${userId})`);
+      await refreshList(userId, respond);
       return;
     }
-    if (rem.status !== 'active') return;
 
-    reminderService.pauseReminder(reminderId);
-    reminderService.logEvent(reminderId, userId, 'paused');
+    if (rem.status === 'active') {
+      reminderService.pauseReminder(reminderId);
+      reminderService.logEvent(reminderId, userId, 'paused');
+    } else {
+      // Estado cambió desde que se renderizó la lista (p.ej. disparó y pasó a
+      // completed). Solo refrescamos para mostrar el estado actual.
+      logger.info(`pause_reminder: rem ${reminderId} ya no está active (status=${rem.status})`);
+    }
 
     await refreshList(userId, respond);
   });
@@ -45,37 +51,43 @@ export function registerListActions(app: App) {
     const userId = (body as any).user.id as string;
 
     const rem = reminderService.find(reminderId);
-    if (!rem || rem.creator_slack_id !== userId) return;
-    if (rem.status !== 'paused') return;
-
-    const now = DateTime.utc();
-    let nextFireAt: string | null;
-    let newStatus: 'active' | 'completed' = 'active';
-
-    if (rem.recurrence === 'none') {
-      // One-shot: si la hora original todavía es futura, restáuralo. Si ya pasó,
-      // no hay nada que disparar — pasa a completed.
-      const original = rem.next_fire_at
-        ? DateTime.fromISO(rem.next_fire_at, { zone: 'utc' })
-        : null;
-      if (original && original > now) {
-        nextFireAt = rem.next_fire_at;
-      } else {
-        nextFireAt = null;
-        newStatus = 'completed';
-      }
-    } else {
-      // Recurrente: calcula la próxima ocurrencia desde ahora.
-      const nxt = nextFire(rem, now);
-      if (nxt) nextFireAt = nxt.toISO();
-      else { nextFireAt = null; newStatus = 'completed'; }
+    if (!rem || rem.creator_slack_id !== userId) {
+      logger.warn(`resume_reminder: unauthorized or not found (rem=${reminderId} user=${userId})`);
+      await refreshList(userId, respond);
+      return;
     }
 
-    reminderService.resumeReminder(reminderId, newStatus, nextFireAt);
-    reminderService.logEvent(reminderId, userId, 'resumed', {
-      new_status: newStatus,
-      next_fire_at: nextFireAt
-    });
+    if (rem.status === 'paused') {
+      const now = DateTime.utc();
+      let nextFireAt: string | null;
+      let newStatus: 'active' | 'completed' = 'active';
+
+      if (rem.recurrence === 'none') {
+        // One-shot: si la hora original todavía es futura, restáuralo. Si ya
+        // pasó, no hay nada que disparar — pasa a completed.
+        const original = rem.next_fire_at
+          ? DateTime.fromISO(rem.next_fire_at, { zone: 'utc' })
+          : null;
+        if (original && original > now) {
+          nextFireAt = rem.next_fire_at;
+        } else {
+          nextFireAt = null;
+          newStatus = 'completed';
+        }
+      } else {
+        const nxt = nextFire(rem, now);
+        if (nxt) nextFireAt = nxt.toISO();
+        else { nextFireAt = null; newStatus = 'completed'; }
+      }
+
+      reminderService.resumeReminder(reminderId, newStatus, nextFireAt);
+      reminderService.logEvent(reminderId, userId, 'resumed', {
+        new_status: newStatus,
+        next_fire_at: nextFireAt
+      });
+    } else {
+      logger.info(`resume_reminder: rem ${reminderId} ya no está paused (status=${rem.status})`);
+    }
 
     await refreshList(userId, respond);
   });
@@ -88,8 +100,15 @@ export function registerListActions(app: App) {
     const userId = (body as any).user.id as string;
 
     const rem = reminderService.find(reminderId);
-    if (!rem || rem.creator_slack_id !== userId) return;
+    if (!rem || rem.creator_slack_id !== userId) {
+      logger.warn(`cancel_reminder: unauthorized or not found (rem=${reminderId} user=${userId})`);
+      await refreshList(userId, respond);
+      return;
+    }
 
+    // cancelReminder es idempotente vía SQL (UPDATE sin guard de status), así
+    // que llamarlo sobre un completed/cancelled no rompe nada y es coherente
+    // con la intención del usuario.
     reminderService.cancelReminder(reminderId);
     reminderService.logEvent(reminderId, userId, 'cancelled');
 
