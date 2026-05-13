@@ -33,10 +33,24 @@ npm run dev
 
 ## Build & deploy
 
+Para correrlo 24/7 en VPS, ver [DEPLOY.md](DEPLOY.md) — guía completa de setup inicial, updates posteriores y troubleshooting.
+
+Resumen rápido:
+
 ```bash
+# primer deploy en el VPS
+ssh root@TU-VPS
+cd /root && git clone https://github.com/neotrasher/recordap.git
+cd recordap
+npm install --omit=dev
+cp .env.example .env && nano .env    # pegar tokens
+npm run migrate
 npm run build
 pm2 start ecosystem.config.js
-pm2 logs recordap
+pm2 save
+
+# updates posteriores
+./scripts/update.sh
 ```
 
 ## Estructura
