@@ -30,40 +30,61 @@ export function buildReminderMessage(args: {
   const mentions = buildMentionLine(effectiveAssignees, groups);
   const blocks: any[] = [];
 
-  // ── Lead line: mentions + title ───────────────────────────────────────────
-  const leadIcon = '📌';
-  const leadMention = forDm ? '*Te toca:*' : mentions;
+  // ── Lead: status pill + título ───────────────────────────────────────────
+  const pill = firePill(rem, pingCount, !!forDm);
   blocks.push({
     type: 'section',
     text: {
       type: 'mrkdwn',
-      text: `${leadMention} ${leadIcon} *${mdEscape(rem.title)}*`
+      text: `${pill}  ·  📌 *${mdEscape(rem.title)}*`
     }
   });
 
-  // ── Description (optional) ────────────────────────────────────────────────
-  if (rem.description) {
+  // ── Línea de menciones (solo en canal — en DM el destinatario ya sabe) ───
+  if (!forDm) {
     blocks.push({
       type: 'section',
-      text: { type: 'mrkdwn', text: mdEscape(rem.description) }
+      text: { type: 'mrkdwn', text: mentions }
     });
   }
 
-  // ── Context: scheduled time + ping count (for tasks) ──────────────────────
-  const ctxElems: any[] = [
-    { type: 'mrkdwn', text: `🕐 ${slackDate(scheduledFor)}` }
+  // ── Descripción opcional en blockquote ────────────────────────────────────
+  if (rem.description) {
+    // El blockquote de Slack se aplica con "> " al inicio de cada línea.
+    const quoted = mdEscape(rem.description)
+      .split('\n')
+      .map(l => `> ${l}`)
+      .join('\n');
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: quoted }
+    });
+  }
+
+  // ── Context línea 1: timing ──────────────────────────────────────────────
+  const timingElems: any[] = [
+    { type: 'mrkdwn', text: `⏰ Vence ${slackDate(scheduledFor)}` }
   ];
   if (rem.reminder_type === 'task') {
-    const cap = rem.max_pings === 'inf' ? '' : `/${rem.max_pings}`;
-    ctxElems.push({ type: 'mrkdwn', text: `🔔 Recordatorio ${pingCount}${cap}` });
+    const cap = rem.max_pings === 'inf' ? '' : ` de ${rem.max_pings}`;
+    timingElems.push({ type: 'mrkdwn', text: `🔔 Recordatorio ${pingCount}${cap}` });
   }
+  if (forDm) {
+    timingElems.push({ type: 'mrkdwn', text: `📍 En <#${rem.channel_id}>` });
+  }
+  blocks.push({ type: 'context', elements: timingElems });
+
+  // ── Context línea 2: recurrencia + nota opcional (snooze, reassign…) ─────
+  const recurNoteElems: any[] = [];
   if (rem.recurrence !== 'none') {
-    ctxElems.push({ type: 'mrkdwn', text: `🔁 ${recurrenceLabel(rem)}` });
+    recurNoteElems.push({ type: 'mrkdwn', text: `🔁 ${recurrenceLabel(rem)}` });
   }
   if (note) {
-    ctxElems.push({ type: 'mrkdwn', text: note });
+    recurNoteElems.push({ type: 'mrkdwn', text: note });
   }
-  blocks.push({ type: 'context', elements: ctxElems });
+  if (recurNoteElems.length > 0) {
+    blocks.push({ type: 'context', elements: recurNoteElems });
+  }
 
   // ── Action buttons (only for tasks; ping mode has no follow-up) ───────────
   if (rem.reminder_type === 'task') {
@@ -206,6 +227,25 @@ function buildMentionLineLocal(users: string[], groups: string[]): string {
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Pill de estado que aparece arriba del mensaje. Slack no permite colores
+ * custom, así que usamos un emoji de color + `código` para que el texto
+ * salga en monospace gris (la pill nativa más cerca de un badge).
+ *
+ *   🟡 `PENDIENTE`     task activo con menos de la mitad de pings consumidos
+ *   🔴 `ATRASADO`      task activo con más de la mitad consumidos
+ *   📢 `AVISO`         ping (one-shot informativo, sin Hecho)
+ *   🟡 `TE TOCA A TI`  task en DM (más personal que el del canal)
+ */
+function firePill(rem: Reminder, pingCount: number, forDm: boolean): string {
+  if (rem.reminder_type === 'ping') return '📢 `AVISO`';
+  if (forDm) return '🟡 `TE TOCA A TI`';
+  if (rem.max_pings === 'inf') return '🟡 `PENDIENTE`';
+  const cap = parseInt(rem.max_pings, 10);
+  const overdue = pingCount > Math.ceil(cap / 2);
+  return overdue ? '🔴 `ATRASADO`' : '🟡 `PENDIENTE`';
+}
 
 function buildMentionLine(users: string[], groups: string[]): string {
   if (users.length === 0 && groups.length === 0) return '<!here>';

@@ -196,7 +196,7 @@ const markRuleCompletedStmt = db.prepare(`
   WHERE id = ? AND status = 'active' AND next_fire_at IS NULL
 `);
 
-const LIST_LIMIT = 25;
+const LIST_LIMIT = 15;
 
 const listMineCurrentStmt = db.prepare<[string, string], Reminder>(`
   SELECT * FROM reminders
