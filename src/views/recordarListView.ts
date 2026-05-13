@@ -1,7 +1,8 @@
 import { DateTime } from 'luxon';
-import type { Reminder } from '../types';
+import type { Reminder, ReminderFire } from '../types';
 import { json } from '../types';
 import { slackDate } from '../services/tzService';
+import { reminderService } from '../services/reminderService';
 import { recurrenceLabel } from './reminderMessage';
 
 /**
@@ -14,6 +15,9 @@ import { recurrenceLabel } from './reminderMessage';
  * Se reutiliza tanto en el primer render del slash command como en los
  * `respond({ replace_original: true })` de los action handlers para que la
  * misma UI sea consistente después de cada acción.
+ *
+ * `totalCount` es el conteo SIN LIMIT — si excede los items mostrados,
+ * aparece un footer "+N más" para indicar truncamiento.
  */
 export function buildRecordarListView(reminders: Reminder[], totalCount?: number): { text: string; blocks: any[] } {
   if (reminders.length === 0) {
@@ -47,7 +51,7 @@ export function buildRecordarListView(reminders: Reminder[], totalCount?: number
   const blocks: any[] = [
     {
       type: 'header',
-      text: { type: 'plain_text', text: `Tus recordatorios — ${headerSummary}` }
+      text: { type: 'plain_text', text: `📋 Mis recordatorios — ${headerSummary}` }
     }
   ];
 
@@ -66,12 +70,18 @@ export function buildRecordarListView(reminders: Reminder[], totalCount?: number
       separatorShown = true;
     }
 
+    // Fetch the latest pending fire (if any) — necesario para mostrar
+    // "Esperando Hecho · disparó hace X · N/M recordatorios" y para decidir
+    // pill PENDIENTE vs ATRASADO.
+    const pendingFire = !isClosed && r.status === 'active'
+      ? reminderService.latestPendingFire(r.id)
+      : undefined;
+
     blocks.push({ type: 'divider' });
-    blocks.push(reminderSection(r));
+    blocks.push(reminderSection(r, pendingFire));
     if (!isClosed) blocks.push(reminderActions(r));
   }
 
-  // Footer cuando hay más recordatorios que el LIMIT del query.
   if (totalCount !== undefined && totalCount > reminders.length) {
     const hidden = totalCount - reminders.length;
     blocks.push({ type: 'divider' });
@@ -87,7 +97,7 @@ export function buildRecordarListView(reminders: Reminder[], totalCount?: number
   return { text: `${reminders.length} recordatorios.`, blocks };
 }
 
-function reminderSection(r: Reminder) {
+function reminderSection(r: Reminder, pendingFire?: ReminderFire) {
   const assignees = json.parse<string[]>(r.assignees, []);
   const groups = json.parse<string[]>(r.groups, []);
   const targets = [
@@ -96,35 +106,44 @@ function reminderSection(r: Reminder) {
   ];
   const targetsStr = targets.length ? targets.join(' ') : '_@here_';
 
-  const statusTag = statusBadge(r.status);
-  const nextLine = nextLineFor(r);
+  const pill = listPill(r, pendingFire);
+  const stateLine = stateLineFor(r, pendingFire);
 
   return {
     type: 'section',
     text: {
       type: 'mrkdwn',
       text: [
-        `*${mdEscape(r.title)}*${statusTag} · \`#${r.id}\``,
+        `${pill}  ·  *${mdEscape(r.title)}*  ·  \`#${r.id}\``,
         `<#${r.channel_id}>  ·  🔁 ${recurrenceLabel(r)}`,
-        nextLine,
+        stateLine,
         `👥 ${targetsStr}`
       ].join('\n')
     }
   };
 }
 
-function statusBadge(status: Reminder['status']): string {
-  switch (status) {
-    case 'active':    return '';
-    case 'paused':    return ' `PAUSADO`';
-    case 'completed': return ' `COMPLETADO`';
-    case 'cancelled': return ' `CANCELADO`';
+/**
+ * Pill por estado del recordatorio (más rico que solo el status raw,
+ * porque considera si hay fire pending para distinguir PROGRAMADO vs PENDIENTE
+ * vs ATRASADO).
+ */
+function listPill(r: Reminder, pendingFire?: ReminderFire): string {
+  switch (r.status) {
+    case 'paused':    return '⏸️ `PAUSADO`';
+    case 'completed': return '✅ `COMPLETADO`';
+    case 'cancelled': return '🗑️ `CANCELADO`';
+    case 'active':
+      if (!pendingFire) return '🟢 `PROGRAMADO`';
+      // hay fire pending — decide PENDIENTE vs ATRASADO según consumo de pings
+      if (r.max_pings === 'inf') return '🟡 `PENDIENTE`';
+      const cap = parseInt(r.max_pings, 10);
+      const overdue = pendingFire.ping_count > Math.ceil(cap / 2);
+      return overdue ? '🔴 `ATRASADO`' : '🟡 `PENDIENTE`';
   }
 }
 
-function nextLineFor(r: Reminder): string {
-  // updated_at se almacena vía datetime('now') de SQLite → formato 'YYYY-MM-DD HH:MM:SS',
-  // NO ISO 8601. Hay que parsearlo con fromSQL, no fromISO.
+function stateLineFor(r: Reminder, pendingFire?: ReminderFire): string {
   const updatedAt = DateTime.fromSQL(r.updated_at, { zone: 'utc' });
 
   switch (r.status) {
@@ -135,9 +154,15 @@ function nextLineFor(r: Reminder): string {
     case 'cancelled':
       return `🗑️ Cancelado · ${slackDate(updatedAt)}`;
     case 'active':
+      if (pendingFire) {
+        const firedAt = DateTime.fromISO(pendingFire.fired_at, { zone: 'utc' });
+        const since = ago(firedAt);
+        const cap = r.max_pings === 'inf' ? '' : `/${r.max_pings}`;
+        return `⏳ Esperando Hecho · disparó ${since} · ${pendingFire.ping_count}${cap} recordatorios`;
+      }
       return r.next_fire_at
         ? `📅 ${slackDate(DateTime.fromISO(r.next_fire_at, { zone: 'utc' }))}`
-        : '⏳ _Esperando Done de un disparo previo (sin más disparos programados)_';
+        : '— sin próximo disparo';
   }
 }
 
@@ -185,6 +210,21 @@ function reminderActions(r: Reminder) {
     block_id: `list_actions_${r.id}`,
     elements
   };
+}
+
+/**
+ * "hace 38 min" / "hace 3 h" / "ayer" / "hace 5 días" / fecha corta si es más viejo.
+ */
+function ago(when: DateTime, now: DateTime = DateTime.utc()): string {
+  const minutes = Math.floor(now.diff(when, 'minutes').minutes);
+  if (minutes < 1) return 'ahora';
+  if (minutes < 60) return `hace ${minutes} min`;
+  const hours = Math.floor(now.diff(when, 'hours').hours);
+  if (hours < 24) return `hace ${hours} h`;
+  const days = Math.floor(now.diff(when, 'days').days);
+  if (days === 1) return 'ayer';
+  if (days < 7) return `hace ${days} días`;
+  return slackDate(when, '{date_short_pretty}');
 }
 
 function mdEscape(s: string): string {

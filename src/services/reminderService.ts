@@ -190,6 +190,13 @@ const hasPendingFiresStmt = db.prepare<[number], { cnt: number }>(`
   SELECT COUNT(*) AS cnt FROM reminder_fires WHERE reminder_id = ? AND status = 'pending'
 `);
 
+const latestPendingFireStmt = db.prepare<[number], ReminderFire>(`
+  SELECT * FROM reminder_fires
+  WHERE reminder_id = ? AND status = 'pending'
+  ORDER BY fired_at DESC
+  LIMIT 1
+`);
+
 const markRuleCompletedStmt = db.prepare(`
   UPDATE reminders
   SET status = 'completed', updated_at = datetime('now')
@@ -367,6 +374,10 @@ export const reminderService = {
   hasPendingFires(reminderId: number): boolean {
     const r = hasPendingFiresStmt.get(reminderId);
     return !!(r && r.cnt > 0);
+  },
+
+  latestPendingFire(reminderId: number): ReminderFire | undefined {
+    return latestPendingFireStmt.get(reminderId);
   },
 
   getDueRepings(nowIso: string): ReminderFire[] {
