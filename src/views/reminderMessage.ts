@@ -231,7 +231,7 @@ function snoozeLabel(preset: string): string {
   }
 }
 
-function recurrenceLabel(rem: Reminder): string {
+export function recurrenceLabel(rem: Reminder): string {
   switch (rem.recurrence) {
     case 'daily':                  return 'Cada día';
     case 'weekdays':               return 'Días hábiles';

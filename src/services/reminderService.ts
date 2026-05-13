@@ -161,6 +161,26 @@ const cancelReminderStmt = db.prepare(`
   WHERE id = ?
 `);
 
+const pauseReminderStmt = db.prepare(`
+  UPDATE reminders
+  SET status = 'paused', updated_at = datetime('now')
+  WHERE id = ? AND status = 'active'
+`);
+
+const resumeReminderStmt = db.prepare(`
+  UPDATE reminders
+  SET status = ?, next_fire_at = ?, updated_at = datetime('now')
+  WHERE id = ? AND status = 'paused'
+`);
+
+const listMineManageableStmt = db.prepare<[string], Reminder>(`
+  SELECT * FROM reminders
+  WHERE creator_slack_id = ? AND status IN ('active', 'paused')
+  ORDER BY
+    CASE status WHEN 'active' THEN 0 ELSE 1 END,
+    COALESCE(next_fire_at, '9999-12-31') ASC
+`);
+
 // ── re-ping queries ─────────────────────────────────────────────────────────
 
 const getDueRepingsStmt = db.prepare<[string], ReminderFire>(`
@@ -263,6 +283,18 @@ export const reminderService = {
 
   cancelReminder(reminderId: number) {
     cancelReminderStmt.run(reminderId);
+  },
+
+  pauseReminder(reminderId: number): boolean {
+    return pauseReminderStmt.run(reminderId).changes > 0;
+  },
+
+  resumeReminder(reminderId: number, newStatus: 'active' | 'completed', nextFireAt: string | null): boolean {
+    return resumeReminderStmt.run(newStatus, nextFireAt, reminderId).changes > 0;
+  },
+
+  listMineManageable(slackId: string): Reminder[] {
+    return listMineManageableStmt.all(slackId);
   },
 
   getDueRepings(nowIso: string): ReminderFire[] {

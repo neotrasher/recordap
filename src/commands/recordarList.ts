@@ -1,63 +1,24 @@
 import type { App } from '@slack/bolt';
 import { reminderService } from '../services/reminderService';
-import { slackDate } from '../services/tzService';
-import { DateTime } from 'luxon';
-import { json } from '../types';
+import { buildRecordarListView } from '../views/recordarListView';
 
 /**
- * /recordap-list  → lista efímera de los recordatorios activos del usuario.
+ * /recordap-list  → lista efímera de los recordatorios `active` y `paused` del
+ * usuario. Cada item tiene botones para Pausar / Reanudar / Cancelar.
  *
- * MVP: muestra hasta 10 recordatorios activos del creador con título, canal,
- * próxima fecha de disparo y un ID. Sin acciones todavía (Pausar / Editar / Cancelar
- * llegarán cuando implementemos los block_actions).
+ * La construcción de la vista vive en `views/recordarListView.ts` para que los
+ * action handlers (pause/resume/cancel) la puedan reutilizar al hacer
+ * `respond({ replace_original: true })` después de cada cambio.
  */
 export function registerRecordarList(app: App) {
   app.command('/recordap-list', async ({ ack, body, respond, logger }) => {
     await ack();
 
     try {
-      const reminders = reminderService.listByCreator(body.user_id).slice(0, 10);
-
-      if (reminders.length === 0) {
-        await respond({
-          response_type: 'ephemeral',
-          text: 'No tienes recordatorios activos. Crea uno con `/recordap`.'
-        });
-        return;
-      }
-
-      const items = reminders.map(r => {
-        const next = r.next_fire_at
-          ? slackDate(DateTime.fromISO(r.next_fire_at))
-          : '—';
-        const assignees = json.parse<string[]>(r.assignees, []);
-        const groups = json.parse<string[]>(r.groups, []);
-        const targets = [
-          ...assignees.map(u => `<@${u}>`),
-          ...groups.map(g => `<!subteam^${g}>`)
-        ];
-        const targetsStr = targets.length ? targets.join(' ') : '_(@here)_';
-
-        return [
-          `*${r.title}*  \`#${r.id}\``,
-          `<#${r.channel_id}>  ·  próximo: ${next}  ·  ${r.recurrence}`,
-          `Para: ${targetsStr}`
-        ].join('\n');
-      });
-
+      const reminders = reminderService.listMineManageable(body.user_id);
       await respond({
         response_type: 'ephemeral',
-        blocks: [
-          {
-            type: 'header',
-            text: { type: 'plain_text', text: `Tus recordatorios activos (${reminders.length})` }
-          },
-          ...items.flatMap(text => [
-            { type: 'divider' as const },
-            { type: 'section' as const, text: { type: 'mrkdwn' as const, text } }
-          ])
-        ],
-        text: `Tienes ${reminders.length} recordatorios activos.`
+        ...buildRecordarListView(reminders)
       });
     } catch (err) {
       logger.error({ err }, '/recordap-list failed');

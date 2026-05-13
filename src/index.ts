@@ -7,6 +7,7 @@ import { registerRecordarList } from './commands/recordarList';
 import { registerReminderCreate } from './actions/reminderCreate';
 import { registerGroupsLookup } from './actions/groupsLookup';
 import { registerFireActions } from './actions/fireActions';
+import { registerListActions } from './actions/listActions';
 import { fireTick } from './jobs/fireTick';
 import { repingTick } from './jobs/repingTick';
 
@@ -34,10 +35,8 @@ async function main() {
   // Botones del mensaje del recordatorio: Done / Snooze / Reasignar
   registerFireActions(app);
 
-  // Block actions
-  // TODO: app.action({ action_id: /^done(?:_\d+)?$/ }, ...)
-  // TODO: app.action({ action_id: /^snooze:/ }, ...)
-  // TODO: app.action({ action_id: 'reassign' }, ...)
+  // Botones del listado /recordap-list: Pausar / Reanudar / Cancelar
+  registerListActions(app);
 
   // Health DM (mention the bot anywhere)
   app.event('app_mention', async ({ event, say }) => {
