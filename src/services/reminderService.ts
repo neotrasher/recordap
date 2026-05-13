@@ -181,6 +181,30 @@ const listMineManageableStmt = db.prepare<[string], Reminder>(`
     COALESCE(next_fire_at, '9999-12-31') ASC
 `);
 
+/**
+ * Variante de listMineManageable que también incluye recordatorios completed
+ * o cancelled actualizados en las últimas 24h. Sirve para que el usuario vea
+ * "qué pasó con eso que acabo de crear" cuando los one-shot disparan rápido.
+ */
+const listMineCurrentStmt = db.prepare<[string, string], Reminder>(`
+  SELECT * FROM reminders
+  WHERE creator_slack_id = ?
+    AND (
+      status IN ('active', 'paused')
+      OR (status IN ('completed', 'cancelled') AND updated_at >= ?)
+    )
+  ORDER BY
+    CASE status
+      WHEN 'active'    THEN 0
+      WHEN 'paused'    THEN 1
+      WHEN 'completed' THEN 2
+      WHEN 'cancelled' THEN 3
+      ELSE 4
+    END,
+    COALESCE(next_fire_at, '9999-12-31') ASC,
+    updated_at DESC
+`);
+
 // ── re-ping queries ─────────────────────────────────────────────────────────
 
 const getDueRepingsStmt = db.prepare<[string], ReminderFire>(`
@@ -295,6 +319,10 @@ export const reminderService = {
 
   listMineManageable(slackId: string): Reminder[] {
     return listMineManageableStmt.all(slackId);
+  },
+
+  listMineCurrent(slackId: string, sinceIso: string): Reminder[] {
+    return listMineCurrentStmt.all(slackId, sinceIso);
   },
 
   getDueRepings(nowIso: string): ReminderFire[] {

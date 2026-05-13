@@ -5,8 +5,11 @@ import { slackDate } from '../services/tzService';
 import { recurrenceLabel } from './reminderMessage';
 
 /**
- * Vista efímera para `/recordap-list`. Lista los recordatorios `active` o
- * `paused` del usuario con botones para Pausar / Reanudar / Cancelar.
+ * Vista efímera para `/recordap-list`. Lista los recordatorios del usuario:
+ *   • `active`     — con botones Pausar / Cancelar
+ *   • `paused`     — con botones Reanudar / Cancelar
+ *   • `completed`  — solo info (últimas 24h)
+ *   • `cancelled`  — solo info (últimas 24h)
  *
  * Se reutiliza tanto en el primer render del slash command como en los
  * `respond({ replace_original: true })` de los action handlers para que la
@@ -19,17 +22,26 @@ export function buildRecordarListView(reminders: Reminder[]): { text: string; bl
       blocks: [
         {
           type: 'section',
-          text: { type: 'mrkdwn', text: '_No tienes recordatorios activos ni pausados. Crea uno con `/recordap`._' }
+          text: {
+            type: 'mrkdwn',
+            text: '_No tienes recordatorios activos, pausados ni completados en las últimas 24h. Crea uno con `/recordap`._'
+          }
         }
       ]
     };
   }
 
-  const activeCount = reminders.filter(r => r.status === 'active').length;
-  const pausedCount = reminders.filter(r => r.status === 'paused').length;
+  const counts = {
+    active:    reminders.filter(r => r.status === 'active').length,
+    paused:    reminders.filter(r => r.status === 'paused').length,
+    completed: reminders.filter(r => r.status === 'completed').length,
+    cancelled: reminders.filter(r => r.status === 'cancelled').length
+  };
   const headerSummary = [
-    activeCount ? `${activeCount} activo${activeCount === 1 ? '' : 's'}` : null,
-    pausedCount ? `${pausedCount} pausado${pausedCount === 1 ? '' : 's'}` : null
+    counts.active    ? `${counts.active} activo${counts.active === 1 ? '' : 's'}` : null,
+    counts.paused    ? `${counts.paused} pausado${counts.paused === 1 ? '' : 's'}` : null,
+    counts.completed ? `${counts.completed} completado${counts.completed === 1 ? '' : 's'}` : null,
+    counts.cancelled ? `${counts.cancelled} cancelado${counts.cancelled === 1 ? '' : 's'}` : null
   ].filter(Boolean).join(' · ');
 
   const blocks: any[] = [
@@ -39,17 +51,30 @@ export function buildRecordarListView(reminders: Reminder[]): { text: string; bl
     }
   ];
 
+  // Separador entre manejables y "ya cerrados" si hay de ambos
+  let separatorShown = false;
   for (const r of reminders) {
+    const isClosed = r.status === 'completed' || r.status === 'cancelled';
+    if (isClosed && !separatorShown) {
+      blocks.push({ type: 'divider' });
+      blocks.push({
+        type: 'context',
+        elements: [
+          { type: 'mrkdwn', text: '*Recientes (últimas 24h)* — solo lectura' }
+        ]
+      });
+      separatorShown = true;
+    }
+
     blocks.push({ type: 'divider' });
     blocks.push(reminderSection(r));
-    blocks.push(reminderActions(r));
+    if (!isClosed) blocks.push(reminderActions(r));
   }
 
   return { text: `${reminders.length} recordatorios.`, blocks };
 }
 
 function reminderSection(r: Reminder) {
-  const isPaused = r.status === 'paused';
   const assignees = json.parse<string[]>(r.assignees, []);
   const groups = json.parse<string[]>(r.groups, []);
   const targets = [
@@ -58,25 +83,45 @@ function reminderSection(r: Reminder) {
   ];
   const targetsStr = targets.length ? targets.join(' ') : '_@here_';
 
-  const status = isPaused ? ' `PAUSADO`' : '';
-  const nextLine = isPaused
-    ? '⏸️ _Pausado — no dispara hasta que lo reanudes_'
-    : r.next_fire_at
-      ? `📅 ${slackDate(DateTime.fromISO(r.next_fire_at, { zone: 'utc' }))}`
-      : '— sin próximo disparo';
+  const statusTag = statusBadge(r.status);
+  const nextLine = nextLineFor(r);
 
   return {
     type: 'section',
     text: {
       type: 'mrkdwn',
       text: [
-        `*${mdEscape(r.title)}*${status} · \`#${r.id}\``,
+        `*${mdEscape(r.title)}*${statusTag} · \`#${r.id}\``,
         `<#${r.channel_id}>  ·  🔁 ${recurrenceLabel(r)}`,
         nextLine,
         `👥 ${targetsStr}`
       ].join('\n')
     }
   };
+}
+
+function statusBadge(status: Reminder['status']): string {
+  switch (status) {
+    case 'active':    return '';
+    case 'paused':    return ' `PAUSADO`';
+    case 'completed': return ' `COMPLETADO`';
+    case 'cancelled': return ' `CANCELADO`';
+  }
+}
+
+function nextLineFor(r: Reminder): string {
+  switch (r.status) {
+    case 'paused':
+      return '⏸️ _Pausado — no dispara hasta que lo reanudes_';
+    case 'completed':
+      return `✅ Completado · ${slackDate(DateTime.fromISO(r.updated_at, { zone: 'utc' }))}`;
+    case 'cancelled':
+      return `🗑️ Cancelado · ${slackDate(DateTime.fromISO(r.updated_at, { zone: 'utc' }))}`;
+    case 'active':
+      return r.next_fire_at
+        ? `📅 ${slackDate(DateTime.fromISO(r.next_fire_at, { zone: 'utc' }))}`
+        : '— sin próximo disparo';
+  }
 }
 
 function reminderActions(r: Reminder) {

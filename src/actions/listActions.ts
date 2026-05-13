@@ -120,7 +120,9 @@ async function refreshList(
   userId: string,
   respond: (msg: any) => Promise<unknown>
 ): Promise<void> {
-  const list = reminderService.listMineManageable(userId);
+  // Mismo criterio que el slash command: managables + recientes 24h.
+  const since = DateTime.utc().minus({ hours: 24 }).toISO()!;
+  const list = reminderService.listMineCurrent(userId, since);
   await respond({
     response_type: 'ephemeral',
     replace_original: true,
