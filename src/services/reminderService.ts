@@ -155,6 +155,36 @@ const updateReminderAssigneesStmt = db.prepare(`
   WHERE id = ?
 `);
 
+const updateReminderStmt = db.prepare(`
+  UPDATE reminders SET
+    title             = @title,
+    description       = @description,
+    channel_id        = @channel_id,
+    assignees         = @assignees_json,
+    groups            = @groups_json,
+    rotation_mode     = @rotation_mode,
+    timezone          = @timezone,
+    hour              = @hour,
+    minute            = @minute,
+    recurrence        = @recurrence,
+    recurrence_data   = @recurrence_data,
+    ends_mode         = @ends_mode,
+    ends_data         = @ends_data,
+    reminder_type     = @reminder_type,
+    reping_every      = @reping_every,
+    max_pings         = @max_pings,
+    notify_channel    = @notify_channel,
+    notify_dm         = @notify_dm,
+    notify_only_turn  = @notify_only_turn,
+    allow_done        = @allow_done,
+    allow_snooze      = @allow_snooze,
+    allow_reassign    = @allow_reassign,
+    snooze_presets    = @snooze_presets_json,
+    next_fire_at      = @next_fire_at,
+    updated_at        = datetime('now')
+  WHERE id = @id
+`);
+
 const cancelReminderStmt = db.prepare(`
   UPDATE reminders
   SET status = 'cancelled', next_fire_at = NULL, updated_at = datetime('now')
@@ -332,6 +362,23 @@ export const reminderService = {
 
   updateAssignees(reminderId: number, assignees: string[]) {
     updateReminderAssigneesStmt.run(JSON.stringify(assignees), reminderId);
+  },
+
+  /**
+   * Actualización completa del recordatorio. Usado por el flujo Editar.
+   * No toca: status, rotation_index, fires_count, created_at (preservan
+   * el ciclo de vida y la historia). Si el `next_fire_at` cambia (porque
+   * se editó fecha/hora/recurrencia/timezone), el caller debe recomputarlo
+   * antes de llamar a este método.
+   */
+  updateReminder(input: CreateReminderInput & { id: number }): boolean {
+    const info = updateReminderStmt.run({
+      ...input,
+      assignees_json: JSON.stringify(input.assignees),
+      groups_json: JSON.stringify(input.groups),
+      snooze_presets_json: JSON.stringify(input.snooze_presets)
+    });
+    return info.changes > 0;
   },
 
   cancelReminder(reminderId: number) {

@@ -8,6 +8,7 @@ import { registerReminderCreate } from './actions/reminderCreate';
 import { registerGroupsLookup } from './actions/groupsLookup';
 import { registerFireActions } from './actions/fireActions';
 import { registerListActions } from './actions/listActions';
+import { registerEditReminder } from './actions/editReminder';
 import { registerModalConditionals } from './actions/modalConditionals';
 import { fireTick } from './jobs/fireTick';
 import { repingTick } from './jobs/repingTick';
@@ -38,6 +39,9 @@ async function main() {
 
   // Botones del listado /recordap-list: Pausar / Reanudar / Cancelar
   registerListActions(app);
+
+  // Botón ✏️ Editar de /recordap-list: abre modal con valores precargados
+  registerEditReminder(app);
 
   // Campos condicionales del modal de creación (recurrence/type/actions)
   registerModalConditionals(app);

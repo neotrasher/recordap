@@ -121,52 +121,52 @@ export function registerReminderCreate(app: App) {
     // ── ack first, then do the persistent work ──────────────────────────────
     await ack();
 
+    // Detección de modo edición vs creación: el handler de Editar pone el
+    // reminder_id en private_metadata cuando abre el modal.
+    const editingId = view.private_metadata ? parseInt(view.private_metadata, 10) : NaN;
+    const isEditing = Number.isFinite(editingId);
+
+    const payload = {
+      creator_slack_id: body.user.id,
+      title, description,
+      channel_id: channel_id!,
+      assignees, groups, rotation_mode,
+      timezone: timezone!, hour: hh, minute: mm,
+      recurrence, recurrence_data,
+      ends_mode, ends_data: null,
+      reminder_type, reping_every, max_pings,
+      notify_channel:   notify.includes('channel')      ? 1 : 0,
+      notify_dm:        notify.includes('dm_assignees') ? 1 : 0,
+      notify_only_turn: notify.includes('dm_only_turn') ? 1 : 0,
+      allow_done:     actions.includes('done')     ? 1 : 0,
+      allow_snooze:   actions.includes('snooze')   ? 1 : 0,
+      allow_reassign: actions.includes('reassign') ? 1 : 0,
+      snooze_presets: snooze_presets.length ? snooze_presets : ['15m', '1h', 'tomorrow_9'],
+      next_fire_at
+    } as const;
+
     try {
-      const id = reminderService.create({
-        creator_slack_id: body.user.id,
-        title, description,
-        channel_id: channel_id!,
-        assignees, groups, rotation_mode,
-        timezone: timezone!, hour: hh, minute: mm,
-        recurrence, recurrence_data,
-        ends_mode, ends_data: null,
-        reminder_type, reping_every, max_pings,
-        notify_channel:   notify.includes('channel')      ? 1 : 0,
-        notify_dm:        notify.includes('dm_assignees') ? 1 : 0,
-        notify_only_turn: notify.includes('dm_only_turn') ? 1 : 0,
-        allow_done:     actions.includes('done')     ? 1 : 0,
-        allow_snooze:   actions.includes('snooze')   ? 1 : 0,
-        allow_reassign: actions.includes('reassign') ? 1 : 0,
-        snooze_presets: snooze_presets.length ? snooze_presets : ['15m', '1h', 'tomorrow_9'],
-        next_fire_at
-      });
-
-      reminderService.logEvent(id, body.user.id, 'created', {
-        title, channel_id, assignees, groups, recurrence, timezone
-      });
-
-      // Confirmation DM
-      const firstFire = DateTime.fromISO(next_fire_at);
-      await client.chat.postMessage({
-        channel: body.user.id,
-        text: `✅ Recordatorio creado: ${title}`,
-        blocks: [
-          {
-            type: 'section',
-            text: { type: 'mrkdwn', text: `✅ *Recordatorio creado*\n${title}` }
-          },
-          {
-            type: 'context',
-            elements: [
-              { type: 'mrkdwn', text: `*Primer disparo:* ${slackDate(firstFire)}` },
-              { type: 'mrkdwn', text: `*Canal:* <#${channel_id}>` },
-              { type: 'mrkdwn', text: `*ID:* \`${id}\` · gestiónalo con \`/recordap-list\`` }
-            ]
-          }
-        ]
-      });
+      if (isEditing) {
+        // ── UPDATE existente ────────────────────────────────────────────────
+        const existing = reminderService.find(editingId);
+        if (!existing || existing.creator_slack_id !== body.user.id) {
+          throw new Error('No autorizado o el recordatorio fue eliminado');
+        }
+        reminderService.updateReminder({ id: editingId, ...payload } as any);
+        reminderService.logEvent(editingId, body.user.id, 'edited', {
+          changed: { title, recurrence, timezone, hour: hh, minute: mm }
+        });
+        await sendUpdateDm(client, body.user.id, editingId, title, channel_id!, next_fire_at);
+      } else {
+        // ── CREATE nuevo ────────────────────────────────────────────────────
+        const id = reminderService.create(payload);
+        reminderService.logEvent(id, body.user.id, 'created', {
+          title, channel_id, assignees, groups, recurrence, timezone
+        });
+        await sendCreateDm(client, body.user.id, id, title, channel_id!, next_fire_at);
+      }
     } catch (err) {
-      logger.error({ err }, 'reminder_create_modal: persist failed');
+      logger.error({ err }, `reminder_create_modal: ${isEditing ? 'update' : 'create'} failed`);
       try {
         await client.chat.postMessage({
           channel: body.user.id,
@@ -174,6 +174,48 @@ export function registerReminderCreate(app: App) {
         });
       } catch { /* swallow */ }
     }
+  });
+}
+
+async function sendCreateDm(
+  client: any, userId: string, id: number, title: string, channelId: string, nextFireAt: string
+) {
+  const firstFire = DateTime.fromISO(nextFireAt);
+  await client.chat.postMessage({
+    channel: userId,
+    text: `✅ Recordatorio creado: ${title}`,
+    blocks: [
+      { type: 'section', text: { type: 'mrkdwn', text: `✅ *Recordatorio creado*\n${title}` } },
+      {
+        type: 'context',
+        elements: [
+          { type: 'mrkdwn', text: `*Primer disparo:* ${slackDate(firstFire)}` },
+          { type: 'mrkdwn', text: `*Canal:* <#${channelId}>` },
+          { type: 'mrkdwn', text: `*ID:* \`${id}\` · gestiónalo con \`/recordap-list\`` }
+        ]
+      }
+    ]
+  });
+}
+
+async function sendUpdateDm(
+  client: any, userId: string, id: number, title: string, channelId: string, nextFireAt: string
+) {
+  const nextFire = DateTime.fromISO(nextFireAt);
+  await client.chat.postMessage({
+    channel: userId,
+    text: `✏️ Recordatorio actualizado: ${title}`,
+    blocks: [
+      { type: 'section', text: { type: 'mrkdwn', text: `✏️ *Recordatorio actualizado*\n${title}` } },
+      {
+        type: 'context',
+        elements: [
+          { type: 'mrkdwn', text: `*Próximo disparo:* ${slackDate(nextFire)}` },
+          { type: 'mrkdwn', text: `*Canal:* <#${channelId}>` },
+          { type: 'mrkdwn', text: `*ID:* \`${id}\`` }
+        ]
+      }
+    ]
   });
 }
 

@@ -170,6 +170,13 @@ function reminderActions(r: Reminder) {
   const isPaused = r.status === 'paused';
   const elements: any[] = [];
 
+  elements.push({
+    type: 'button',
+    action_id: 'edit_reminder',
+    value: String(r.id),
+    text: { type: 'plain_text', text: '✏️ Editar' }
+  });
+
   if (isPaused) {
     elements.push({
       type: 'button',

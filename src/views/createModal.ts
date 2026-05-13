@@ -1,19 +1,37 @@
 import type { View } from '@slack/web-api';
 import { COMMON_TIMEZONES } from '../services/tzService';
 import { DateTime } from 'luxon';
-import type { RecurrenceKind, ReminderType } from '../config';
+import type { RecurrenceKind, ReminderType, RotationMode, RepingEvery, MaxPings } from '../config';
 
 interface CreateModalOpts {
   /** IANA tz to preselect (creator's tz from Slack profile). */
   defaultTimezone: string;
   /** Channel from which the slash command was invoked, if any (preselect). */
   triggerChannelId?: string;
-  /** Current recurrence selection — drives mostrar/ocultar weekdays + cron. */
+  /** Current recurrence selection — drives mostrar/ocultar weekdays. */
   recurrence?: RecurrenceKind;
   /** Current reminder type — drives mostrar/ocultar reping + max_pings. */
   reminderType?: ReminderType;
   /** Acciones marcadas — driver mostrar/ocultar snooze_presets. */
   actionsSelected?: string[];
+  /** Si está set, el modal está editando este reminder (no creando uno nuevo). */
+  editingReminderId?: number;
+  /** Valores iniciales para todos los campos (precarga al editar). */
+  initial?: {
+    title?: string;
+    description?: string | null;
+    assignees?: string[];
+    groupOptions?: { value: string; label: string }[];
+    rotationMode?: RotationMode;
+    date?: string;
+    time?: string;
+    weekdays?: string[];
+    endsMode?: 'never' | 'on_date' | 'after_n';
+    notify?: string[];
+    repingEvery?: RepingEvery;
+    maxPings?: MaxPings;
+    snoozePresets?: string[];
+  };
 }
 
 /**
@@ -33,43 +51,45 @@ export function createModalView(opts: CreateModalOpts): View {
   const recurrence     = opts.recurrence ?? 'none';
   const reminderType   = opts.reminderType ?? 'ping';
   const actionsSelected = opts.actionsSelected ?? ['done', 'snooze', 'reassign'];
+  const init = opts.initial ?? {};
+  const isEditing = typeof opts.editingReminderId === 'number';
 
   const blocks: any[] = [
     { type: 'header', text: { type: 'plain_text', text: '📝 ¿Qué quieres recordar?' } },
-    titleInput(),
-    descInput(),
+    titleInput(init.title),
+    descInput(init.description ?? undefined),
 
     { type: 'divider' },
     { type: 'header', text: { type: 'plain_text', text: '📍 Destino' } },
     channelInput(opts.triggerChannelId),
-    assigneesInput(),
-    groupsInput(),
+    assigneesInput(init.assignees),
+    groupsInput(init.groupOptions),
     emptyAssignmentContext(),
-    rotationInput(),
+    rotationInput(init.rotationMode),
 
     { type: 'divider' },
     { type: 'header', text: { type: 'plain_text', text: '⏰ Cuándo' } },
-    dateInput(today),
-    timeInput(),
+    dateInput(init.date ?? today),
+    timeInput(init.time),
     recurrenceInput(recurrence)
   ];
 
-  if (recurrence === 'weekly') blocks.push(weekdaysInput());
+  if (recurrence === 'weekly') blocks.push(weekdaysInput(init.weekdays));
 
-  blocks.push(endsInput());
+  blocks.push(endsInput(init.endsMode));
   blocks.push(timezoneInput(opts.defaultTimezone));
 
   blocks.push({ type: 'divider' });
   blocks.push({ type: 'header', text: { type: 'plain_text', text: '🔔 Notificaciones' } });
-  blocks.push(notifyInput());
+  blocks.push(notifyInput(init.notify));
 
   blocks.push({ type: 'divider' });
   blocks.push({ type: 'header', text: { type: 'plain_text', text: '✅ Tipo de recordatorio' } });
   blocks.push(typeInput(reminderType));
 
   if (reminderType === 'task') {
-    blocks.push(repingInput());
-    blocks.push(maxPingsInput());
+    blocks.push(repingInput(init.repingEvery));
+    blocks.push(maxPingsInput(init.maxPings));
   }
 
   blocks.push({ type: 'divider' });
@@ -77,14 +97,15 @@ export function createModalView(opts: CreateModalOpts): View {
   blocks.push(actionsInput(actionsSelected));
 
   if (actionsSelected.includes('snooze')) {
-    blocks.push(snoozePresetsInput());
+    blocks.push(snoozePresetsInput(init.snoozePresets));
   }
 
   return {
     type: 'modal',
     callback_id: 'reminder_create_modal',
-    title:  { type: 'plain_text', text: 'Nuevo recordatorio' },
-    submit: { type: 'plain_text', text: 'Crear' },
+    private_metadata: isEditing ? String(opts.editingReminderId) : undefined,
+    title:  { type: 'plain_text', text: isEditing ? `Editar recordatorio #${opts.editingReminderId}` : 'Nuevo recordatorio' },
+    submit: { type: 'plain_text', text: isEditing ? 'Guardar cambios' : 'Crear' },
     close:  { type: 'plain_text', text: 'Cancelar' },
     blocks
   };
@@ -92,7 +113,7 @@ export function createModalView(opts: CreateModalOpts): View {
 
 // ── individual blocks ──────────────────────────────────────────────────────
 
-function titleInput() {
+function titleInput(initial?: string) {
   return {
     type: 'input',
     block_id: 'title_block',
@@ -101,12 +122,13 @@ function titleInput() {
       type: 'plain_text_input',
       action_id: 'title',
       placeholder: { type: 'plain_text', text: 'Ej: Enviar reporte semanal' },
-      max_length: 120
+      max_length: 120,
+      ...(initial !== undefined ? { initial_value: initial } : {})
     }
   } as const;
 }
 
-function descInput() {
+function descInput(initial?: string) {
   return {
     type: 'input',
     block_id: 'desc_block',
@@ -117,7 +139,8 @@ function descInput() {
       type: 'plain_text_input',
       action_id: 'description',
       multiline: true,
-      max_length: 500
+      max_length: 500,
+      ...(initial !== undefined ? { initial_value: initial } : {})
     }
   } as const;
 }
@@ -139,7 +162,7 @@ function channelInput(initialChannel?: string) {
   } as const;
 }
 
-function assigneesInput() {
+function assigneesInput(initial?: string[]) {
   return {
     type: 'input',
     block_id: 'assignees_block',
@@ -149,12 +172,13 @@ function assigneesInput() {
     element: {
       type: 'multi_users_select',
       action_id: 'assignees',
-      placeholder: { type: 'plain_text', text: 'Selecciona personas' }
+      placeholder: { type: 'plain_text', text: 'Selecciona personas' },
+      ...(initial && initial.length > 0 ? { initial_users: initial } : {})
     }
   } as const;
 }
 
-function groupsInput() {
+function groupsInput(initialOptions?: { value: string; label: string }[]) {
   return {
     type: 'input',
     block_id: 'groups_block',
@@ -165,7 +189,15 @@ function groupsInput() {
       type: 'multi_external_select',
       action_id: 'groups',
       placeholder: { type: 'plain_text', text: 'Selecciona uno o más grupos' },
-      min_query_length: 0
+      min_query_length: 0,
+      ...(initialOptions && initialOptions.length > 0
+        ? {
+            initial_options: initialOptions.map(o => ({
+              text: { type: 'plain_text' as const, text: o.label },
+              value: o.value
+            }))
+          }
+        : {})
     }
   } as const;
 }
@@ -180,7 +212,11 @@ function emptyAssignmentContext() {
   } as const;
 }
 
-function rotationInput() {
+function rotationInput(initial: RotationMode = 'all') {
+  const all = rotationOption('all', 'Todos a la vez', 'Pinguea a todos los asignados en cada disparo.');
+  const rotate = rotationOption('rotate', 'Rotación (round-robin)', 'Cada disparo le toca a una persona distinta.');
+  const firstTaker = rotationOption('first_taker', 'Primero disponible', 'Pinguea al grupo y queda dueño quien toque Done o Tomar primero.');
+  const initialOpt = initial === 'rotate' ? rotate : initial === 'first_taker' ? firstTaker : all;
   return {
     type: 'input',
     block_id: 'rotation_block',
@@ -190,12 +226,8 @@ function rotationInput() {
     element: {
       type: 'radio_buttons',
       action_id: 'rotation',
-      initial_option: rotationOption('all', 'Todos a la vez', 'Pinguea a todos los asignados en cada disparo.'),
-      options: [
-        rotationOption('all', 'Todos a la vez', 'Pinguea a todos los asignados en cada disparo.'),
-        rotationOption('rotate', 'Rotación (round-robin)', 'Cada disparo le toca a una persona distinta.'),
-        rotationOption('first_taker', 'Primero disponible', 'Pinguea al grupo y queda dueño quien toque Done o Tomar primero.')
-      ]
+      initial_option: initialOpt,
+      options: [all, rotate, firstTaker]
     }
   } as const;
 }
@@ -215,12 +247,12 @@ function dateInput(initialDate: string) {
     element: { type: 'datepicker', action_id: 'date', initial_date: initialDate }
   } as const;
 }
-function timeInput() {
+function timeInput(initial?: string) {
   return {
     type: 'input',
     block_id: 'time_block',
     label: { type: 'plain_text', text: 'Hora' },
-    element: { type: 'timepicker', action_id: 'time', initial_time: '09:00' }
+    element: { type: 'timepicker', action_id: 'time', initial_time: initial ?? '09:00' }
   } as const;
 }
 
@@ -250,8 +282,15 @@ function recurrenceInput(initialValue: RecurrenceKind = 'none') {
   } as const;
 }
 
-function weekdaysInput() {
+function weekdaysInput(initial?: string[]) {
   const opt = (v: string, t: string) => ({ text: { type: 'plain_text' as const, text: t }, value: v });
+  const options = [
+    opt('mon', 'Lun'), opt('tue', 'Mar'), opt('wed', 'Mié'),
+    opt('thu', 'Jue'), opt('fri', 'Vie'), opt('sat', 'Sáb'), opt('sun', 'Dom')
+  ];
+  const initialOptions = initial && initial.length > 0
+    ? options.filter(o => initial.includes(o.value))
+    : [];
   return {
     type: 'input',
     block_id: 'weekdays_block',
@@ -260,16 +299,16 @@ function weekdaysInput() {
     element: {
       type: 'checkboxes',
       action_id: 'weekdays',
-      options: [
-        opt('mon', 'Lun'), opt('tue', 'Mar'), opt('wed', 'Mié'),
-        opt('thu', 'Jue'), opt('fri', 'Vie'), opt('sat', 'Sáb'), opt('sun', 'Dom')
-      ]
+      ...(initialOptions.length > 0 ? { initial_options: initialOptions } : {}),
+      options
     }
   } as const;
 }
 
-function endsInput() {
+function endsInput(initial?: string) {
   const opt = (v: string, t: string) => ({ text: { type: 'plain_text' as const, text: t }, value: v });
+  const options = [opt('never', 'Nunca'), opt('on_date', 'En fecha específica'), opt('after_n', 'Después de N ocurrencias')];
+  const initialOpt = options.find(o => o.value === initial) ?? options[0];
   return {
     type: 'input',
     block_id: 'ends_block',
@@ -278,8 +317,8 @@ function endsInput() {
     element: {
       type: 'static_select',
       action_id: 'ends',
-      initial_option: opt('never', 'Nunca'),
-      options: [opt('never', 'Nunca'), opt('on_date', 'En fecha específica'), opt('after_n', 'Después de N ocurrencias')]
+      initial_option: initialOpt,
+      options
     }
   } as const;
 }
@@ -308,11 +347,15 @@ function timezoneInput(defaultTz: string) {
   } as const;
 }
 
-function notifyInput() {
+function notifyInput(initial?: string[]) {
   const opt = (v: string, t: string) => ({ text: { type: 'plain_text' as const, text: t }, value: v });
   const channel = opt('channel', 'Publicar en el canal seleccionado');
   const dm = opt('dm_assignees', 'DM a cada persona asignada (no a miembros de grupos)');
   const onlyTurn = opt('dm_only_turn', 'DM solo al de turno (cuando hay rotación)');
+  const all = [channel, dm, onlyTurn];
+  const initialOptions = initial
+    ? all.filter(o => initial.includes(o.value))
+    : [channel, dm];
   return {
     type: 'input',
     block_id: 'notify_block',
@@ -321,8 +364,8 @@ function notifyInput() {
     element: {
       type: 'checkboxes',
       action_id: 'notify',
-      initial_options: [channel, dm],
-      options: [channel, dm, onlyTurn]
+      ...(initialOptions.length > 0 ? { initial_options: initialOptions } : {}),
+      options: all
     }
   } as const;
 }
@@ -353,8 +396,17 @@ function typeInput(initialValue: ReminderType = 'ping') {
   } as const;
 }
 
-function repingInput() {
+function repingInput(initial?: RepingEvery) {
   const opt = (v: string, t: string) => ({ text: { type: 'plain_text' as const, text: t }, value: v });
+  const options = [
+    opt('off', 'No re-pinguear'),
+    opt('15m', '15 minutos'),
+    opt('30m', '30 minutos'),
+    opt('1h', '1 hora'),
+    opt('2h', '2 horas'),
+    opt('1d', 'Al día siguiente, misma hora')
+  ];
+  const initialOpt = options.find(o => o.value === initial) ?? options.find(o => o.value === '30m')!;
   return {
     type: 'input',
     block_id: 'reping_block',
@@ -364,21 +416,16 @@ function repingInput() {
     element: {
       type: 'static_select',
       action_id: 'reping',
-      initial_option: opt('30m', '30 minutos'),
-      options: [
-        opt('off', 'No re-pinguear'),
-        opt('15m', '15 minutos'),
-        opt('30m', '30 minutos'),
-        opt('1h', '1 hora'),
-        opt('2h', '2 horas'),
-        opt('1d', 'Al día siguiente, misma hora')
-      ]
+      initial_option: initialOpt,
+      options
     }
   } as const;
 }
 
-function maxPingsInput() {
+function maxPingsInput(initial?: MaxPings) {
   const opt = (v: string, t: string) => ({ text: { type: 'plain_text' as const, text: t }, value: v });
+  const options = [opt('3', '3 recordatorios'), opt('5', '5 recordatorios'), opt('10', '10 recordatorios'), opt('inf', 'Sin límite')];
+  const initialOpt = options.find(o => o.value === initial) ?? options.find(o => o.value === '5')!;
   return {
     type: 'input',
     block_id: 'max_pings_block',
@@ -388,8 +435,8 @@ function maxPingsInput() {
     element: {
       type: 'static_select',
       action_id: 'max_pings',
-      initial_option: opt('5', '5 recordatorios'),
-      options: [opt('3', '3 recordatorios'), opt('5', '5 recordatorios'), opt('10', '10 recordatorios'), opt('inf', 'Sin límite')]
+      initial_option: initialOpt,
+      options
     }
   } as const;
 }
@@ -414,8 +461,19 @@ function actionsInput(initialSelected: string[] = ['done', 'snooze', 'reassign']
   } as const;
 }
 
-function snoozePresetsInput() {
+function snoozePresetsInput(initial?: string[]) {
   const opt = (v: string, t: string) => ({ text: { type: 'plain_text' as const, text: t }, value: v });
+  const options = [
+    opt('15m', '15 minutos'),
+    opt('1h', '1 hora'),
+    opt('today_16', 'Esta tarde 4pm'),
+    opt('tomorrow_9', 'Mañana 9am'),
+    opt('next_monday_9', 'Próximo lunes 9am'),
+    opt('custom', 'Fecha personalizada')
+  ];
+  const initialOptions = initial
+    ? options.filter(o => initial.includes(o.value))
+    : options.filter(o => ['15m', '1h', 'tomorrow_9'].includes(o.value));
   return {
     type: 'input',
     block_id: 'snooze_presets_block',
@@ -425,15 +483,8 @@ function snoozePresetsInput() {
     element: {
       type: 'checkboxes',
       action_id: 'snooze_presets',
-      initial_options: [opt('15m', '15 minutos'), opt('1h', '1 hora'), opt('tomorrow_9', 'Mañana 9am')],
-      options: [
-        opt('15m', '15 minutos'),
-        opt('1h', '1 hora'),
-        opt('today_16', 'Esta tarde 4pm'),
-        opt('tomorrow_9', 'Mañana 9am'),
-        opt('next_monday_9', 'Próximo lunes 9am'),
-        opt('custom', 'Fecha personalizada')
-      ]
+      ...(initialOptions.length > 0 ? { initial_options: initialOptions } : {}),
+      options
     }
   } as const;
 }
