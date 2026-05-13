@@ -22,9 +22,10 @@ export function registerRecordarList(app: App) {
     try {
       const since = DateTime.utc().minus({ hours: RECENT_WINDOW_HOURS }).toISO()!;
       const reminders = reminderService.listMineCurrent(body.user_id, since);
+      const total = reminderService.countMineCurrent(body.user_id, since);
       await respond({
         response_type: 'ephemeral',
-        ...buildRecordarListView(reminders)
+        ...buildRecordarListView(reminders, total)
       });
     } catch (err) {
       logger.error({ err }, '/recordap-list failed');

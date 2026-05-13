@@ -15,7 +15,7 @@ import { recurrenceLabel } from './reminderMessage';
  * `respond({ replace_original: true })` de los action handlers para que la
  * misma UI sea consistente después de cada acción.
  */
-export function buildRecordarListView(reminders: Reminder[]): { text: string; blocks: any[] } {
+export function buildRecordarListView(reminders: Reminder[], totalCount?: number): { text: string; blocks: any[] } {
   if (reminders.length === 0) {
     return {
       text: 'No tienes recordatorios.',
@@ -69,6 +69,19 @@ export function buildRecordarListView(reminders: Reminder[]): { text: string; bl
     blocks.push({ type: 'divider' });
     blocks.push(reminderSection(r));
     if (!isClosed) blocks.push(reminderActions(r));
+  }
+
+  // Footer cuando hay más recordatorios que el LIMIT del query.
+  if (totalCount !== undefined && totalCount > reminders.length) {
+    const hidden = totalCount - reminders.length;
+    blocks.push({ type: 'divider' });
+    blocks.push({
+      type: 'context',
+      elements: [{
+        type: 'mrkdwn',
+        text: `_+${hidden} recordatorio${hidden === 1 ? '' : 's'} no mostrado${hidden === 1 ? '' : 's'} (límite de Slack). Cancela los que ya no uses para liberar espacio en la lista._`
+      }]
+    });
   }
 
   return { text: `${reminders.length} recordatorios.`, blocks };

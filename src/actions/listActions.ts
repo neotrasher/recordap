@@ -124,9 +124,10 @@ async function refreshList(
   // Mismo criterio que el slash command: managables + recientes 24h.
   const since = DateTime.utc().minus({ hours: 24 }).toISO()!;
   const list = reminderService.listMineCurrent(userId, since);
+  const total = reminderService.countMineCurrent(userId, since);
   await respond({
     response_type: 'ephemeral',
     replace_original: true,
-    ...buildRecordarListView(list)
+    ...buildRecordarListView(list, total)
   });
 }

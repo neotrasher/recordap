@@ -196,6 +196,8 @@ const markRuleCompletedStmt = db.prepare(`
   WHERE id = ? AND status = 'active' AND next_fire_at IS NULL
 `);
 
+const LIST_LIMIT = 25;
+
 const listMineCurrentStmt = db.prepare<[string, string], Reminder>(`
   SELECT * FROM reminders
   WHERE creator_slack_id = ?
@@ -213,6 +215,16 @@ const listMineCurrentStmt = db.prepare<[string, string], Reminder>(`
     END,
     COALESCE(next_fire_at, '9999-12-31') ASC,
     updated_at DESC
+  LIMIT ${LIST_LIMIT}
+`);
+
+const countMineCurrentStmt = db.prepare<[string, string], { cnt: number }>(`
+  SELECT COUNT(*) AS cnt FROM reminders
+  WHERE creator_slack_id = ?
+    AND (
+      status IN ('active', 'paused')
+      OR (status IN ('completed', 'cancelled') AND updated_at >= ?)
+    )
 `);
 
 // ── re-ping queries ─────────────────────────────────────────────────────────
@@ -334,6 +346,12 @@ export const reminderService = {
   listMineCurrent(slackId: string, sinceIso: string): Reminder[] {
     return listMineCurrentStmt.all(slackId, sinceIso);
   },
+
+  countMineCurrent(slackId: string, sinceIso: string): number {
+    return countMineCurrentStmt.get(slackId, sinceIso)?.cnt ?? 0;
+  },
+
+  listLimit: LIST_LIMIT,
 
   /**
    * Cierra automáticamente una regla `active` cuando ya no tiene próximos
