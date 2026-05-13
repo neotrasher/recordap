@@ -24,9 +24,12 @@ git pull --ff-only
 POST_LOCK=$(sha256sum package-lock.json | cut -d' ' -f1)
 
 # ── 2. npm install solo si las deps cambiaron ───────────────────────────────
+# Nota: instalamos TODO (incluyendo devDeps) porque TypeScript vive ahí y lo
+# necesitamos para `npm run build` en el paso 3. El overhead es ~40MB de
+# node_modules — aceptable.
 if [ "$PRE_LOCK" != "$POST_LOCK" ]; then
   echo "→ package-lock.json cambió, instalando deps"
-  npm install --omit=dev
+  npm install
 else
   echo "→ deps sin cambios, salteando npm install"
 fi

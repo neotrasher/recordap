@@ -42,7 +42,7 @@ Resumen rápido:
 ssh root@TU-VPS
 cd /root && git clone https://github.com/neotrasher/recordap.git
 cd recordap
-npm install --omit=dev
+npm install
 cp .env.example .env && nano .env    # pegar tokens
 npm run migrate
 npm run build

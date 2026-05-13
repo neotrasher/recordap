@@ -17,13 +17,13 @@ git clone https://github.com/neotrasher/recordap.git
 cd recordap
 ```
 
-### 1.2. Instalar dependencias de producción
+### 1.2. Instalar dependencias
 
 ```bash
-npm install --omit=dev
+npm install
 ```
 
-> `--omit=dev` ahorra `ts-node-dev` y los `@types/*` que solo se usan en local. El build ya está hecho con `npm run build`.
+> Instalamos todo (incluyendo devDependencies) porque TypeScript vive ahí y lo necesitamos para `npm run build` en el paso 1.5. El overhead es ~40 MB de `node_modules` — aceptable. Si en el futuro pre-compilas el `dist/` localmente y haces deploy con tarball, ahí sí puedes usar `npm install --omit=dev` y saltar el build en el VPS.
 
 ### 1.3. Configurar `.env`
 
@@ -133,7 +133,7 @@ Si prefieres hacerlo a mano:
 ```bash
 cd /root/recordap
 git pull
-npm install --omit=dev   # solo si cambió package-lock
+npm install              # solo si cambió package-lock
 npm run build
 pm2 restart recordap --update-env
 ```
