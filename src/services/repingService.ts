@@ -45,6 +45,10 @@ export async function reping(fire: ReminderFire, client: WebClient): Promise<voi
       fire_id: fire.id,
       total_pings: fire.ping_count
     });
+    // Si la regla está active sin más disparos y este era el último pending, completa.
+    if (reminderService.maybeCompleteRule(rem.id)) {
+      reminderService.logEvent(rem.id, 'system', 'auto_completed', { trigger: 'last_fire_expired' });
+    }
     return;
   }
 

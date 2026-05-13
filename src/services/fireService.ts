@@ -110,15 +110,28 @@ export async function fire(rem: Reminder, client: WebClient): Promise<void> {
   let newNextFireAt: string | null = null;
   let newStatus: 'active' | 'completed' = 'active';
 
-  if (rem.recurrence === 'none') {
-    newStatus = 'completed';
-  } else {
+  if (rem.recurrence !== 'none') {
     // pasamos un stub con fires_count incrementado para que endsReached('after_n')
     // lo evalúe contra el conteo POST-fire
     const stub: Reminder = { ...rem, fires_count: rem.fires_count + 1 };
     const nxt = nextFire(stub, now);
     if (nxt) newNextFireAt = nxt.toISO();
-    else newStatus = 'completed';
+  }
+
+  // Decisión de status:
+  //   - Si hay próximos disparos      → active.
+  //   - Si NO hay próximos disparos:
+  //       - 'ping'  (sin Done)        → completed (no hay nada más por hacer).
+  //       - 'task'  (con Done)        → active todavía. El fire que acabamos de
+  //         crear está pending; la regla cierra cuando ese fire cierre (Done o
+  //         expiración). Esto evita que un one-shot "desaparezca" de la lista
+  //         mientras el usuario todavía tiene un botón Done por pulsar.
+  if (newNextFireAt) {
+    newStatus = 'active';
+  } else if (rem.reminder_type === 'ping') {
+    newStatus = 'completed';
+  } else {
+    newStatus = 'active';
   }
 
   const newRotationIndex = rem.rotation_mode === 'rotate' && assignees.length > 0

@@ -46,6 +46,12 @@ export function registerFireActions(app: App) {
     await updateAllCopies(client, fire.channel_id, fire.channel_ts, fireId, doneMsg, logger);
 
     reminderService.logEvent(rem.id, userId, 'done', { fire_id: fireId });
+
+    // Si la regla está active sin más disparos y este era el último fire pendiente,
+    // la marcamos completed automáticamente.
+    if (reminderService.maybeCompleteRule(rem.id)) {
+      reminderService.logEvent(rem.id, 'system', 'auto_completed', { trigger: 'last_fire_done' });
+    }
   });
 
   // ── SNOOZE ──────────────────────────────────────────────────────────────────

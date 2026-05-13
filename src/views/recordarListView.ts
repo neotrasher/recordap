@@ -110,17 +110,21 @@ function statusBadge(status: Reminder['status']): string {
 }
 
 function nextLineFor(r: Reminder): string {
+  // updated_at se almacena vía datetime('now') de SQLite → formato 'YYYY-MM-DD HH:MM:SS',
+  // NO ISO 8601. Hay que parsearlo con fromSQL, no fromISO.
+  const updatedAt = DateTime.fromSQL(r.updated_at, { zone: 'utc' });
+
   switch (r.status) {
     case 'paused':
       return '⏸️ _Pausado — no dispara hasta que lo reanudes_';
     case 'completed':
-      return `✅ Completado · ${slackDate(DateTime.fromISO(r.updated_at, { zone: 'utc' }))}`;
+      return `✅ Completado · ${slackDate(updatedAt)}`;
     case 'cancelled':
-      return `🗑️ Cancelado · ${slackDate(DateTime.fromISO(r.updated_at, { zone: 'utc' }))}`;
+      return `🗑️ Cancelado · ${slackDate(updatedAt)}`;
     case 'active':
       return r.next_fire_at
         ? `📅 ${slackDate(DateTime.fromISO(r.next_fire_at, { zone: 'utc' }))}`
-        : '— sin próximo disparo';
+        : '⏳ _Esperando Done de un disparo previo (sin más disparos programados)_';
   }
 }
 

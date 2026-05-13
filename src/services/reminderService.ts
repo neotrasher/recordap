@@ -186,6 +186,16 @@ const listMineManageableStmt = db.prepare<[string], Reminder>(`
  * o cancelled actualizados en las últimas 24h. Sirve para que el usuario vea
  * "qué pasó con eso que acabo de crear" cuando los one-shot disparan rápido.
  */
+const hasPendingFiresStmt = db.prepare<[number], { cnt: number }>(`
+  SELECT COUNT(*) AS cnt FROM reminder_fires WHERE reminder_id = ? AND status = 'pending'
+`);
+
+const markRuleCompletedStmt = db.prepare(`
+  UPDATE reminders
+  SET status = 'completed', updated_at = datetime('now')
+  WHERE id = ? AND status = 'active' AND next_fire_at IS NULL
+`);
+
 const listMineCurrentStmt = db.prepare<[string, string], Reminder>(`
   SELECT * FROM reminders
   WHERE creator_slack_id = ?
@@ -323,6 +333,17 @@ export const reminderService = {
 
   listMineCurrent(slackId: string, sinceIso: string): Reminder[] {
     return listMineCurrentStmt.all(slackId, sinceIso);
+  },
+
+  /**
+   * Cierra automáticamente una regla `active` cuando ya no tiene próximos
+   * disparos programados y no quedan fires en estado `pending`. Idempotente.
+   * Llamar después de cerrar un fire (Done o expiración).
+   */
+  maybeCompleteRule(reminderId: number): boolean {
+    const r = hasPendingFiresStmt.get(reminderId);
+    if (r && r.cnt > 0) return false;
+    return markRuleCompletedStmt.run(reminderId).changes > 0;
   },
 
   getDueRepings(nowIso: string): ReminderFire[] {
