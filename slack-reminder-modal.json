@@ -1,0 +1,406 @@
+{
+  "type": "modal",
+  "callback_id": "reminder_create_modal",
+  "title": { "type": "plain_text", "text": "Nuevo recordatorio" },
+  "submit": { "type": "plain_text", "text": "Crear" },
+  "close": { "type": "plain_text", "text": "Cancelar" },
+  "blocks": [
+    {
+      "type": "header",
+      "text": { "type": "plain_text", "text": "¿Qué quieres recordar?" }
+    },
+    {
+      "type": "input",
+      "block_id": "title_block",
+      "label": { "type": "plain_text", "text": "Título" },
+      "element": {
+        "type": "plain_text_input",
+        "action_id": "title",
+        "placeholder": { "type": "plain_text", "text": "Ej: Enviar reporte semanal" },
+        "max_length": 120
+      }
+    },
+    {
+      "type": "input",
+      "block_id": "desc_block",
+      "optional": true,
+      "label": { "type": "plain_text", "text": "Descripción" },
+      "hint": { "type": "plain_text", "text": "Sumá contexto, link a doc o el criterio para marcar Done." },
+      "element": {
+        "type": "plain_text_input",
+        "action_id": "description",
+        "multiline": true,
+        "max_length": 500
+      }
+    },
+
+    { "type": "divider" },
+    {
+      "type": "header",
+      "text": { "type": "plain_text", "text": "Destino" }
+    },
+    {
+      "type": "input",
+      "block_id": "channel_block",
+      "label": { "type": "plain_text", "text": "Canal donde publicar" },
+      "element": {
+        "type": "conversations_select",
+        "action_id": "channel",
+        "placeholder": { "type": "plain_text", "text": "Selecciona un canal" },
+        "default_to_current_conversation": true,
+        "filter": { "include": ["public", "private"], "exclude_bot_users": true }
+      }
+    },
+    {
+      "type": "input",
+      "block_id": "assignees_block",
+      "optional": true,
+      "label": { "type": "plain_text", "text": "Personas asignadas" },
+      "hint": { "type": "plain_text", "text": "Usuarios individuales. Combinable con grupos." },
+      "element": {
+        "type": "multi_users_select",
+        "action_id": "assignees",
+        "placeholder": { "type": "plain_text", "text": "Selecciona personas" }
+      }
+    },
+    {
+      "type": "input",
+      "block_id": "groups_block",
+      "optional": true,
+      "label": { "type": "plain_text", "text": "Grupos asignados" },
+      "hint": { "type": "plain_text", "text": "User groups del workspace (ej. @engineering, @oncall). Se expanden a sus miembros al disparar." },
+      "element": {
+        "type": "multi_external_select",
+        "action_id": "groups",
+        "placeholder": { "type": "plain_text", "text": "Selecciona uno o más grupos" },
+        "min_query_length": 0
+      }
+    },
+    {
+      "type": "context",
+      "elements": [
+        {
+          "type": "mrkdwn",
+          "text": "_Si dejás vacío personas y grupos, el recordatorio menciona `@here` (solo gente conectada, nunca `@channel`)._"
+        }
+      ]
+    },
+    {
+      "type": "input",
+      "block_id": "rotation_block",
+      "optional": true,
+      "label": { "type": "plain_text", "text": "Modo de asignación" },
+      "hint": { "type": "plain_text", "text": "Los grupos se expanden a sus miembros antes de rotar." },
+      "element": {
+        "type": "radio_buttons",
+        "action_id": "rotation",
+        "initial_option": {
+          "text": { "type": "plain_text", "text": "Todos a la vez" },
+          "description": { "type": "plain_text", "text": "Pinguea a todos los asignados en cada disparo." },
+          "value": "all"
+        },
+        "options": [
+          {
+            "text": { "type": "plain_text", "text": "Todos a la vez" },
+            "description": { "type": "plain_text", "text": "Pinguea a todos los asignados en cada disparo." },
+            "value": "all"
+          },
+          {
+            "text": { "type": "plain_text", "text": "Rotación (round-robin)" },
+            "description": { "type": "plain_text", "text": "Cada disparo le toca a una persona distinta." },
+            "value": "rotate"
+          },
+          {
+            "text": { "type": "plain_text", "text": "Primero disponible" },
+            "description": { "type": "plain_text", "text": "Pinguea al grupo, y queda dueño quien toque Done o Tomar primero." },
+            "value": "first_taker"
+          }
+        ]
+      }
+    },
+
+    { "type": "divider" },
+    {
+      "type": "header",
+      "text": { "type": "plain_text", "text": "Cuándo" }
+    },
+    {
+      "type": "input",
+      "block_id": "date_block",
+      "label": { "type": "plain_text", "text": "Fecha del primer disparo" },
+      "element": {
+        "type": "datepicker",
+        "action_id": "date",
+        "initial_date": "2026-05-13"
+      }
+    },
+    {
+      "type": "input",
+      "block_id": "time_block",
+      "label": { "type": "plain_text", "text": "Hora" },
+      "element": {
+        "type": "timepicker",
+        "action_id": "time",
+        "initial_time": "09:00"
+      }
+    },
+    {
+      "type": "input",
+      "block_id": "recurrence_block",
+      "label": { "type": "plain_text", "text": "Repetir" },
+      "element": {
+        "type": "static_select",
+        "action_id": "recurrence",
+        "initial_option": {
+          "text": { "type": "plain_text", "text": "No repetir" },
+          "value": "none"
+        },
+        "options": [
+          { "text": { "type": "plain_text", "text": "No repetir" }, "value": "none" },
+          { "text": { "type": "plain_text", "text": "Cada día" }, "value": "daily" },
+          { "text": { "type": "plain_text", "text": "Días hábiles (L–V)" }, "value": "weekdays" },
+          { "text": { "type": "plain_text", "text": "Semanal (elegir días)" }, "value": "weekly" },
+          { "text": { "type": "plain_text", "text": "Quincenal" }, "value": "biweekly" },
+          { "text": { "type": "plain_text", "text": "Mensual (mismo día del mes)" }, "value": "monthly_day" },
+          { "text": { "type": "plain_text", "text": "Último día hábil del mes" }, "value": "monthly_last_business" },
+          { "text": { "type": "plain_text", "text": "Personalizado (cron)" }, "value": "custom" }
+        ]
+      }
+    },
+    {
+      "type": "input",
+      "block_id": "weekdays_block",
+      "optional": true,
+      "label": { "type": "plain_text", "text": "Días (solo si elegiste «Semanal»)" },
+      "element": {
+        "type": "checkboxes",
+        "action_id": "weekdays",
+        "options": [
+          { "text": { "type": "plain_text", "text": "Lun" }, "value": "mon" },
+          { "text": { "type": "plain_text", "text": "Mar" }, "value": "tue" },
+          { "text": { "type": "plain_text", "text": "Mié" }, "value": "wed" },
+          { "text": { "type": "plain_text", "text": "Jue" }, "value": "thu" },
+          { "text": { "type": "plain_text", "text": "Vie" }, "value": "fri" },
+          { "text": { "type": "plain_text", "text": "Sáb" }, "value": "sat" },
+          { "text": { "type": "plain_text", "text": "Dom" }, "value": "sun" }
+        ]
+      }
+    },
+    {
+      "type": "input",
+      "block_id": "cron_block",
+      "optional": true,
+      "label": { "type": "plain_text", "text": "Cron (solo si elegiste «Personalizado»)" },
+      "hint": { "type": "plain_text", "text": "Formato cron de 5 campos. Ej: 0 9 * * 1,3,5" },
+      "element": {
+        "type": "plain_text_input",
+        "action_id": "cron",
+        "placeholder": { "type": "plain_text", "text": "0 9 * * 1-5" }
+      }
+    },
+    {
+      "type": "input",
+      "block_id": "ends_block",
+      "optional": true,
+      "label": { "type": "plain_text", "text": "Termina" },
+      "element": {
+        "type": "static_select",
+        "action_id": "ends",
+        "initial_option": {
+          "text": { "type": "plain_text", "text": "Nunca" },
+          "value": "never"
+        },
+        "options": [
+          { "text": { "type": "plain_text", "text": "Nunca" }, "value": "never" },
+          { "text": { "type": "plain_text", "text": "En fecha específica" }, "value": "on_date" },
+          { "text": { "type": "plain_text", "text": "Después de N ocurrencias" }, "value": "after_n" }
+        ]
+      }
+    },
+    {
+      "type": "input",
+      "block_id": "timezone_block",
+      "label": { "type": "plain_text", "text": "Zona horaria" },
+      "hint": { "type": "plain_text", "text": "El disparo se ancla a esta zona. Cada destinatario ve la hora convertida a la suya." },
+      "element": {
+        "type": "static_select",
+        "action_id": "timezone",
+        "initial_option": {
+          "text": { "type": "plain_text", "text": "America/Buenos_Aires (–03:00) · tu zona" },
+          "value": "America/Argentina/Buenos_Aires"
+        },
+        "options": [
+          { "text": { "type": "plain_text", "text": "America/Buenos_Aires (–03:00) · tu zona" }, "value": "America/Argentina/Buenos_Aires" },
+          { "text": { "type": "plain_text", "text": "America/Mexico_City (–06:00)" }, "value": "America/Mexico_City" },
+          { "text": { "type": "plain_text", "text": "America/Bogota (–05:00)" }, "value": "America/Bogota" },
+          { "text": { "type": "plain_text", "text": "America/Santiago (–04:00)" }, "value": "America/Santiago" },
+          { "text": { "type": "plain_text", "text": "America/New_York (–05:00)" }, "value": "America/New_York" },
+          { "text": { "type": "plain_text", "text": "Europe/Madrid (+01:00)" }, "value": "Europe/Madrid" },
+          { "text": { "type": "plain_text", "text": "UTC" }, "value": "UTC" }
+        ]
+      }
+    },
+
+    { "type": "divider" },
+    {
+      "type": "header",
+      "text": { "type": "plain_text", "text": "Notificaciones" }
+    },
+    {
+      "type": "input",
+      "block_id": "notify_block",
+      "optional": true,
+      "label": { "type": "plain_text", "text": "Canales de aviso" },
+      "hint": { "type": "plain_text", "text": "El DM va solo a personas asignadas. A los grupos NO se les expande para DM — solo se mencionan en el canal." },
+      "element": {
+        "type": "checkboxes",
+        "action_id": "notify",
+        "initial_options": [
+          { "text": { "type": "plain_text", "text": "Publicar en el canal seleccionado" }, "value": "channel" },
+          { "text": { "type": "plain_text", "text": "DM a cada persona asignada (no a miembros de grupos)" }, "value": "dm_assignees" }
+        ],
+        "options": [
+          { "text": { "type": "plain_text", "text": "Publicar en el canal seleccionado" }, "value": "channel" },
+          { "text": { "type": "plain_text", "text": "DM a cada persona asignada (no a miembros de grupos)" }, "value": "dm_assignees" },
+          { "text": { "type": "plain_text", "text": "DM solo al de turno (cuando hay rotación)" }, "value": "dm_only_turn" }
+        ]
+      }
+    },
+
+    { "type": "divider" },
+    {
+      "type": "header",
+      "text": { "type": "plain_text", "text": "Tipo de recordatorio" }
+    },
+    {
+      "type": "input",
+      "block_id": "type_block",
+      "label": { "type": "plain_text", "text": "Modo" },
+      "element": {
+        "type": "radio_buttons",
+        "action_id": "type",
+        "initial_option": {
+          "text": { "type": "plain_text", "text": "Aviso simple (sin Done)" },
+          "description": { "type": "plain_text", "text": "Pinguea una vez. Sin estado." },
+          "value": "ping"
+        },
+        "options": [
+          {
+            "text": { "type": "plain_text", "text": "Aviso simple (sin Done)" },
+            "description": { "type": "plain_text", "text": "Pinguea una vez. Sin estado." },
+            "value": "ping"
+          },
+          {
+            "text": { "type": "plain_text", "text": "Actividad — requiere Done" },
+            "description": { "type": "plain_text", "text": "Si nadie marca Done, el bot vuelve a pinguear hasta que se cierre." },
+            "value": "task"
+          }
+        ]
+      }
+    },
+    {
+      "type": "input",
+      "block_id": "reping_block",
+      "optional": true,
+      "label": { "type": "plain_text", "text": "Si no se marca Done, recordar de nuevo cada…" },
+      "hint": { "type": "plain_text", "text": "Solo aplica en modo «Actividad»." },
+      "element": {
+        "type": "static_select",
+        "action_id": "reping",
+        "initial_option": {
+          "text": { "type": "plain_text", "text": "30 minutos" },
+          "value": "30m"
+        },
+        "options": [
+          { "text": { "type": "plain_text", "text": "No re-pinguear" }, "value": "off" },
+          { "text": { "type": "plain_text", "text": "15 minutos" }, "value": "15m" },
+          { "text": { "type": "plain_text", "text": "30 minutos" }, "value": "30m" },
+          { "text": { "type": "plain_text", "text": "1 hora" }, "value": "1h" },
+          { "text": { "type": "plain_text", "text": "2 horas" }, "value": "2h" },
+          { "text": { "type": "plain_text", "text": "Al día siguiente, misma hora" }, "value": "1d" }
+        ]
+      }
+    },
+    {
+      "type": "input",
+      "block_id": "max_pings_block",
+      "optional": true,
+      "label": { "type": "plain_text", "text": "Cortar después de…" },
+      "hint": { "type": "plain_text", "text": "Evita spam infinito si nadie marca Done." },
+      "element": {
+        "type": "static_select",
+        "action_id": "max_pings",
+        "initial_option": {
+          "text": { "type": "plain_text", "text": "5 recordatorios" },
+          "value": "5"
+        },
+        "options": [
+          { "text": { "type": "plain_text", "text": "3 recordatorios" }, "value": "3" },
+          { "text": { "type": "plain_text", "text": "5 recordatorios" }, "value": "5" },
+          { "text": { "type": "plain_text", "text": "10 recordatorios" }, "value": "10" },
+          { "text": { "type": "plain_text", "text": "Sin límite" }, "value": "inf" }
+        ]
+      }
+    },
+
+    { "type": "divider" },
+    {
+      "type": "header",
+      "text": { "type": "plain_text", "text": "Botones del recordatorio" }
+    },
+    {
+      "type": "input",
+      "block_id": "actions_block",
+      "label": { "type": "plain_text", "text": "Acciones disponibles" },
+      "element": {
+        "type": "checkboxes",
+        "action_id": "actions",
+        "initial_options": [
+          { "text": { "type": "plain_text", "text": "Marcar Done" }, "value": "done" },
+          { "text": { "type": "plain_text", "text": "Snooze (posponer)" }, "value": "snooze" },
+          { "text": { "type": "plain_text", "text": "Reasignar" }, "value": "reassign" }
+        ],
+        "options": [
+          { "text": { "type": "plain_text", "text": "Marcar Done" }, "value": "done" },
+          { "text": { "type": "plain_text", "text": "Snooze (posponer)" }, "value": "snooze" },
+          { "text": { "type": "plain_text", "text": "Reasignar" }, "value": "reassign" }
+        ]
+      }
+    },
+    {
+      "type": "input",
+      "block_id": "snooze_presets_block",
+      "optional": true,
+      "label": { "type": "plain_text", "text": "Opciones rápidas de snooze" },
+      "hint": { "type": "plain_text", "text": "Solo si tenés «Snooze» activado arriba." },
+      "element": {
+        "type": "checkboxes",
+        "action_id": "snooze_presets",
+        "initial_options": [
+          { "text": { "type": "plain_text", "text": "15 minutos" }, "value": "15m" },
+          { "text": { "type": "plain_text", "text": "1 hora" }, "value": "1h" },
+          { "text": { "type": "plain_text", "text": "Mañana 9am" }, "value": "tomorrow_9" }
+        ],
+        "options": [
+          { "text": { "type": "plain_text", "text": "15 minutos" }, "value": "15m" },
+          { "text": { "type": "plain_text", "text": "1 hora" }, "value": "1h" },
+          { "text": { "type": "plain_text", "text": "Esta tarde 4pm" }, "value": "today_16" },
+          { "text": { "type": "plain_text", "text": "Mañana 9am" }, "value": "tomorrow_9" },
+          { "text": { "type": "plain_text", "text": "Próximo lunes 9am" }, "value": "next_monday_9" },
+          { "text": { "type": "plain_text", "text": "Fecha personalizada" }, "value": "custom" }
+        ]
+      }
+    },
+
+    { "type": "divider" },
+    {
+      "type": "context",
+      "elements": [
+        {
+          "type": "mrkdwn",
+          "text": "💡 Después podés editar, pausar o ver historial con `/remind-pro list`."
+        }
+      ]
+    }
+  ]
+}
