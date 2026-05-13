@@ -1,6 +1,5 @@
 import type { App } from '@slack/bolt';
 import { DateTime } from 'luxon';
-import { CronExpressionParser } from 'cron-parser';
 import { reminderService } from '../services/reminderService';
 import { nextFire } from '../services/recurrenceService';
 import { slackDate } from '../services/tzService';
@@ -46,7 +45,6 @@ export function registerReminderCreate(app: App) {
     const timeStr        = t(v, 'time_block', 'time');
     const recurrence     = (opt(v, 'recurrence_block', 'recurrence') as RecurrenceKind) ?? 'none';
     const weekdays       = opts(v, 'weekdays_block', 'weekdays');
-    const cron           = (s(v, 'cron_block', 'cron') ?? '').trim();
     const ends_mode      = (opt(v, 'ends_block', 'ends') as 'never' | 'on_date' | 'after_n') ?? 'never';
     const timezone       = opt(v, 'timezone_block', 'timezone');
     const notify         = opts(v, 'notify_block', 'notify');
@@ -65,14 +63,7 @@ export function registerReminderCreate(app: App) {
     if (!timeStr)                                errors.time_block       = 'Selecciona una hora.';
     if (!timezone)                               errors.timezone_block   = 'Selecciona una zona horaria.';
     if (recurrence === 'weekly' && !weekdays.length)
-                                                 errors.weekdays_block   = 'Elegí al menos un día.';
-    if (recurrence === 'custom') {
-      if (!cron)                                 errors.cron_block       = 'Pegá una expresión cron válida.';
-      else {
-        try { CronExpressionParser.parse(cron, { tz: timezone }); }
-        catch (e) { errors.cron_block = `Cron inválido: ${(e as Error).message}`; }
-      }
-    }
+                                                 errors.weekdays_block   = 'Elige al menos un día.';
     if (Object.keys(errors).length) {
       await ack({ response_action: 'errors', errors });
       return;
@@ -98,7 +89,7 @@ export function registerReminderCreate(app: App) {
       return;
     }
 
-    const recurrence_data = buildRecurrenceData(recurrence, weekdays, cron, chosen);
+    const recurrence_data = buildRecurrenceData(recurrence, weekdays, chosen);
     const now = DateTime.utc();
 
     let next_fire_at: string;
@@ -189,14 +180,12 @@ export function registerReminderCreate(app: App) {
 function buildRecurrenceData(
   recurrence: RecurrenceKind,
   weekdays: string[],
-  cron: string,
   firstFireLocal: DateTime
 ): string | null {
   switch (recurrence) {
     case 'weekly':       return JSON.stringify({ weekdays });
     case 'biweekly':     return JSON.stringify({ anchor: firstFireLocal.toISO() });
     case 'monthly_day':  return JSON.stringify({ day: firstFireLocal.day });
-    case 'custom':       return JSON.stringify({ cron });
     default:             return null;
   }
 }

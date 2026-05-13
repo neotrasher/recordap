@@ -34,8 +34,7 @@ export type RecurrenceKind =
   | 'weekly'
   | 'biweekly'
   | 'monthly_day'
-  | 'monthly_last_business'
-  | 'custom';
+  | 'monthly_last_business';
 
 export type ReminderType = 'ping' | 'task';
 export type RotationMode = 'all' | 'rotate' | 'first_taker';

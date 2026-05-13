@@ -1,5 +1,4 @@
 import { DateTime } from 'luxon';
-import { CronExpressionParser } from 'cron-parser';
 import { LUXON_TO_KEY, WeekdayKey } from '../config';
 import type { Reminder } from '../types';
 
@@ -64,20 +63,6 @@ function dayMatches(rem: Reminder, dt: DateTime): boolean {
 
     case 'monthly_last_business':
       return isLastBusinessDay(dt);
-
-    case 'custom': {
-      // Use cron-parser to compute the next match strictly after the previous minute.
-      // We assert that the cron expression's next match equals `dt` to-the-minute.
-      const data = rem.recurrence_data ? JSON.parse(rem.recurrence_data) : {};
-      const expr: string = data.cron;
-      if (!expr) return false;
-      const it = CronExpressionParser.parse(expr, {
-        currentDate: dt.minus({ minutes: 1 }).toJSDate(),
-        tz: rem.timezone
-      });
-      const nxt = DateTime.fromJSDate(it.next().toDate(), { zone: rem.timezone });
-      return nxt.toMillis() === dt.toMillis();
-    }
   }
 }
 

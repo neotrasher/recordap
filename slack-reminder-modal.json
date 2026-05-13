@@ -162,8 +162,7 @@
           { "text": { "type": "plain_text", "text": "Semanal (elegir días)" }, "value": "weekly" },
           { "text": { "type": "plain_text", "text": "Quincenal" }, "value": "biweekly" },
           { "text": { "type": "plain_text", "text": "Mensual (mismo día del mes)" }, "value": "monthly_day" },
-          { "text": { "type": "plain_text", "text": "Último día hábil del mes" }, "value": "monthly_last_business" },
-          { "text": { "type": "plain_text", "text": "Personalizado (cron)" }, "value": "custom" }
+          { "text": { "type": "plain_text", "text": "Último día hábil del mes" }, "value": "monthly_last_business" }
         ]
       }
     },
@@ -184,18 +183,6 @@
           { "text": { "type": "plain_text", "text": "Sáb" }, "value": "sat" },
           { "text": { "type": "plain_text", "text": "Dom" }, "value": "sun" }
         ]
-      }
-    },
-    {
-      "type": "input",
-      "block_id": "cron_block",
-      "optional": true,
-      "label": { "type": "plain_text", "text": "Cron (solo si elegiste «Personalizado»)" },
-      "hint": { "type": "plain_text", "text": "Formato cron de 5 campos. Ej: 0 9 * * 1,3,5" },
-      "element": {
-        "type": "plain_text_input",
-        "action_id": "cron",
-        "placeholder": { "type": "plain_text", "text": "0 9 * * 1-5" }
       }
     },
     {

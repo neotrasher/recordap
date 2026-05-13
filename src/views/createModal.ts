@@ -55,7 +55,6 @@ export function createModalView(opts: CreateModalOpts): View {
   ];
 
   if (recurrence === 'weekly') blocks.push(weekdaysInput());
-  if (recurrence === 'custom') blocks.push(cronInput());
 
   blocks.push(endsInput());
   blocks.push(timezoneInput(opts.defaultTimezone));
@@ -234,8 +233,7 @@ function recurrenceInput(initialValue: RecurrenceKind = 'none') {
     opt('weekly', 'Semanal (elegir días)'),
     opt('biweekly', 'Quincenal'),
     opt('monthly_day', 'Mensual (mismo día del mes)'),
-    opt('monthly_last_business', 'Último día hábil del mes'),
-    opt('custom', 'Personalizado (cron)')
+    opt('monthly_last_business', 'Último día hábil del mes')
   ];
   const initial = options.find(o => o.value === initialValue) ?? options[0];
   return {
@@ -266,21 +264,6 @@ function weekdaysInput() {
         opt('mon', 'Lun'), opt('tue', 'Mar'), opt('wed', 'Mié'),
         opt('thu', 'Jue'), opt('fri', 'Vie'), opt('sat', 'Sáb'), opt('sun', 'Dom')
       ]
-    }
-  } as const;
-}
-
-function cronInput() {
-  return {
-    type: 'input',
-    block_id: 'cron_block',
-    optional: true,
-    label: { type: 'plain_text', text: 'Cron (solo si elegiste «Personalizado»)' },
-    hint: { type: 'plain_text', text: 'Formato cron de 5 campos. Ej: 0 9 * * 1,3,5' },
-    element: {
-      type: 'plain_text_input',
-      action_id: 'cron',
-      placeholder: { type: 'plain_text', text: '0 9 * * 1-5' }
     }
   } as const;
 }

@@ -245,7 +245,6 @@ export function recurrenceLabel(rem: Reminder): string {
     case 'biweekly':               return 'Quincenal';
     case 'monthly_day':            return `Día ${json.parse<{ day: number }>(rem.recurrence_data, { day: 1 }).day} de cada mes`;
     case 'monthly_last_business':  return 'Último día hábil del mes';
-    case 'custom':                 return `Cron · ${json.parse<{ cron: string }>(rem.recurrence_data, { cron: '?' }).cron}`;
     case 'none':                   return 'Único';
   }
 }
