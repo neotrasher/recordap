@@ -81,7 +81,7 @@
       "elements": [
         {
           "type": "mrkdwn",
-          "text": "_Si dejás vacío personas y grupos, el recordatorio menciona `@here` (solo gente conectada, nunca `@channel`)._"
+          "text": "_Si dejas vacío personas y grupos, el recordatorio menciona `@here` (solo gente conectada, nunca `@channel`)._"
         }
       ]
     },
@@ -359,7 +359,7 @@
       "block_id": "snooze_presets_block",
       "optional": true,
       "label": { "type": "plain_text", "text": "Opciones rápidas de snooze" },
-      "hint": { "type": "plain_text", "text": "Solo si tenés «Snooze» activado arriba." },
+      "hint": { "type": "plain_text", "text": "Solo si tienes «Snooze» activado arriba." },
       "element": {
         "type": "checkboxes",
         "action_id": "snooze_presets",
@@ -385,7 +385,7 @@
       "elements": [
         {
           "type": "mrkdwn",
-          "text": "💡 Después podés editar, pausar o ver historial con `/remind-pro list`."
+          "text": "💡 Después puedes editar, pausar o ver historial con `/recordap-list`."
         }
       ]
     }
