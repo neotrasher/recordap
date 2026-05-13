@@ -1,68 +1,93 @@
 import type { View } from '@slack/web-api';
 import { COMMON_TIMEZONES } from '../services/tzService';
 import { DateTime } from 'luxon';
+import type { RecurrenceKind, ReminderType } from '../config';
 
 interface CreateModalOpts {
   /** IANA tz to preselect (creator's tz from Slack profile). */
   defaultTimezone: string;
   /** Channel from which the slash command was invoked, if any (preselect). */
   triggerChannelId?: string;
+  /** Current recurrence selection — drives mostrar/ocultar weekdays + cron. */
+  recurrence?: RecurrenceKind;
+  /** Current reminder type — drives mostrar/ocultar reping + max_pings. */
+  reminderType?: ReminderType;
+  /** Acciones marcadas — driver mostrar/ocultar snooze_presets. */
+  actionsSelected?: string[];
 }
 
 /**
  * Build the Block Kit `view` payload for the reminder creation modal.
  *
- * Note: this is the canonical source — the JSON file at
- * `slack-reminder-modal.json` (in the repo root) is its preview-ready twin.
- * Keep them in sync when you tweak fields.
+ * Los bloques condicionales (weekdays, cron, reping/max_pings, snooze_presets)
+ * solo se incluyen cuando los campos que los gatillan están en el valor
+ * apropiado. Los inputs gatillo tienen `dispatch_action: true` para que un
+ * cambio de selección reactive `views.update` con la nueva forma del modal.
+ *
+ * Nota: este es el source canónico — el JSON en `slack-reminder-modal.json`
+ * (en la raíz del repo) es su gemelo preview-ready. Si lo tocas acá, refrescá
+ * el JSON también.
  */
 export function createModalView(opts: CreateModalOpts): View {
   const today = DateTime.now().setZone(opts.defaultTimezone).toFormat('yyyy-LL-dd');
+  const recurrence     = opts.recurrence ?? 'none';
+  const reminderType   = opts.reminderType ?? 'ping';
+  const actionsSelected = opts.actionsSelected ?? ['done', 'snooze', 'reassign'];
+
+  const blocks: any[] = [
+    { type: 'header', text: { type: 'plain_text', text: '¿Qué quieres recordar?' } },
+    titleInput(),
+    descInput(),
+
+    { type: 'divider' },
+    { type: 'header', text: { type: 'plain_text', text: 'Destino' } },
+    channelInput(opts.triggerChannelId),
+    assigneesInput(),
+    groupsInput(),
+    emptyAssignmentContext(),
+    rotationInput(),
+
+    { type: 'divider' },
+    { type: 'header', text: { type: 'plain_text', text: 'Cuándo' } },
+    dateInput(today),
+    timeInput(),
+    recurrenceInput(recurrence)
+  ];
+
+  if (recurrence === 'weekly') blocks.push(weekdaysInput());
+  if (recurrence === 'custom') blocks.push(cronInput());
+
+  blocks.push(endsInput());
+  blocks.push(timezoneInput(opts.defaultTimezone));
+
+  blocks.push({ type: 'divider' });
+  blocks.push({ type: 'header', text: { type: 'plain_text', text: 'Notificaciones' } });
+  blocks.push(notifyInput());
+
+  blocks.push({ type: 'divider' });
+  blocks.push({ type: 'header', text: { type: 'plain_text', text: 'Tipo de recordatorio' } });
+  blocks.push(typeInput(reminderType));
+
+  if (reminderType === 'task') {
+    blocks.push(repingInput());
+    blocks.push(maxPingsInput());
+  }
+
+  blocks.push({ type: 'divider' });
+  blocks.push({ type: 'header', text: { type: 'plain_text', text: 'Botones del recordatorio' } });
+  blocks.push(actionsInput(actionsSelected));
+
+  if (actionsSelected.includes('snooze')) {
+    blocks.push(snoozePresetsInput());
+  }
 
   return {
     type: 'modal',
     callback_id: 'reminder_create_modal',
-    title: { type: 'plain_text', text: 'Nuevo recordatorio' },
+    title:  { type: 'plain_text', text: 'Nuevo recordatorio' },
     submit: { type: 'plain_text', text: 'Crear' },
-    close: { type: 'plain_text', text: 'Cancelar' },
-    blocks: [
-      { type: 'header', text: { type: 'plain_text', text: '¿Qué quieres recordar?' } },
-      titleInput(),
-      descInput(),
-
-      { type: 'divider' },
-      { type: 'header', text: { type: 'plain_text', text: 'Destino' } },
-      channelInput(opts.triggerChannelId),
-      assigneesInput(),
-      groupsInput(),
-      emptyAssignmentContext(),
-      rotationInput(),
-
-      { type: 'divider' },
-      { type: 'header', text: { type: 'plain_text', text: 'Cuándo' } },
-      dateInput(today),
-      timeInput(),
-      recurrenceInput(),
-      weekdaysInput(),
-      cronInput(),
-      endsInput(),
-      timezoneInput(opts.defaultTimezone),
-
-      { type: 'divider' },
-      { type: 'header', text: { type: 'plain_text', text: 'Notificaciones' } },
-      notifyInput(),
-
-      { type: 'divider' },
-      { type: 'header', text: { type: 'plain_text', text: 'Tipo de recordatorio' } },
-      typeInput(),
-      repingInput(),
-      maxPingsInput(),
-
-      { type: 'divider' },
-      { type: 'header', text: { type: 'plain_text', text: 'Botones del recordatorio' } },
-      actionsInput(),
-      snoozePresetsInput()
-    ]
+    close:  { type: 'plain_text', text: 'Cancelar' },
+    blocks
   };
 }
 
@@ -200,26 +225,29 @@ function timeInput() {
   } as const;
 }
 
-function recurrenceInput() {
+function recurrenceInput(initialValue: RecurrenceKind = 'none') {
   const opt = (v: string, t: string) => ({ text: { type: 'plain_text' as const, text: t }, value: v });
+  const options = [
+    opt('none', 'No repetir'),
+    opt('daily', 'Cada día'),
+    opt('weekdays', 'Días hábiles (L–V)'),
+    opt('weekly', 'Semanal (elegir días)'),
+    opt('biweekly', 'Quincenal'),
+    opt('monthly_day', 'Mensual (mismo día del mes)'),
+    opt('monthly_last_business', 'Último día hábil del mes'),
+    opt('custom', 'Personalizado (cron)')
+  ];
+  const initial = options.find(o => o.value === initialValue) ?? options[0];
   return {
     type: 'input',
     block_id: 'recurrence_block',
+    dispatch_action: true,    // ← cambiar = re-renderizar modal con campos condicionales
     label: { type: 'plain_text', text: 'Repetir' },
     element: {
       type: 'static_select',
       action_id: 'recurrence',
-      initial_option: opt('none', 'No repetir'),
-      options: [
-        opt('none', 'No repetir'),
-        opt('daily', 'Cada día'),
-        opt('weekdays', 'Días hábiles (L–V)'),
-        opt('weekly', 'Semanal (elegir días)'),
-        opt('biweekly', 'Quincenal'),
-        opt('monthly_day', 'Mensual (mismo día del mes)'),
-        opt('monthly_last_business', 'Último día hábil del mes'),
-        opt('custom', 'Personalizado (cron)')
-      ]
+      initial_option: initial,
+      options
     }
   } as const;
 }
@@ -316,7 +344,7 @@ function notifyInput() {
   } as const;
 }
 
-function typeInput() {
+function typeInput(initialValue: ReminderType = 'ping') {
   const ping = {
     text: { type: 'plain_text' as const, text: 'Aviso simple (sin Done)' },
     description: { type: 'plain_text' as const, text: 'Pinguea una vez. Sin estado.' },
@@ -327,14 +355,16 @@ function typeInput() {
     description: { type: 'plain_text' as const, text: 'Si nadie marca Done, el bot vuelve a pinguear hasta que se cierre.' },
     value: 'task'
   };
+  const initial = initialValue === 'task' ? task : ping;
   return {
     type: 'input',
     block_id: 'type_block',
+    dispatch_action: true,    // ← cambiar = mostrar/ocultar reping + max_pings
     label: { type: 'plain_text', text: 'Modo' },
     element: {
       type: 'radio_buttons',
       action_id: 'type',
-      initial_option: ping,
+      initial_option: initial,
       options: [ping, task]
     }
   } as const;
@@ -381,19 +411,22 @@ function maxPingsInput() {
   } as const;
 }
 
-function actionsInput() {
+function actionsInput(initialSelected: string[] = ['done', 'snooze', 'reassign']) {
   const done = { text: { type: 'plain_text' as const, text: 'Marcar Done' }, value: 'done' };
   const snooze = { text: { type: 'plain_text' as const, text: 'Snooze (posponer)' }, value: 'snooze' };
   const reassign = { text: { type: 'plain_text' as const, text: 'Reasignar' }, value: 'reassign' };
+  const all = [done, snooze, reassign];
+  const initial = all.filter(o => initialSelected.includes(o.value));
   return {
     type: 'input',
     block_id: 'actions_block',
+    dispatch_action: true,    // ← cambiar = mostrar/ocultar snooze_presets
     label: { type: 'plain_text', text: 'Acciones disponibles' },
     element: {
       type: 'checkboxes',
       action_id: 'actions',
-      initial_options: [done, snooze, reassign],
-      options: [done, snooze, reassign]
+      ...(initial.length > 0 ? { initial_options: initial } : {}),
+      options: all
     }
   } as const;
 }

@@ -8,6 +8,7 @@ import { registerReminderCreate } from './actions/reminderCreate';
 import { registerGroupsLookup } from './actions/groupsLookup';
 import { registerFireActions } from './actions/fireActions';
 import { registerListActions } from './actions/listActions';
+import { registerModalConditionals } from './actions/modalConditionals';
 import { fireTick } from './jobs/fireTick';
 import { repingTick } from './jobs/repingTick';
 
@@ -37,6 +38,9 @@ async function main() {
 
   // Botones del listado /recordap-list: Pausar / Reanudar / Cancelar
   registerListActions(app);
+
+  // Campos condicionales del modal de creación (recurrence/type/actions)
+  registerModalConditionals(app);
 
   // Health DM (mention the bot anywhere)
   app.event('app_mention', async ({ event, say }) => {
