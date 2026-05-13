@@ -35,12 +35,12 @@ export function createModalView(opts: CreateModalOpts): View {
   const actionsSelected = opts.actionsSelected ?? ['done', 'snooze', 'reassign'];
 
   const blocks: any[] = [
-    { type: 'header', text: { type: 'plain_text', text: '¿Qué quieres recordar?' } },
+    { type: 'header', text: { type: 'plain_text', text: '📝 ¿Qué quieres recordar?' } },
     titleInput(),
     descInput(),
 
     { type: 'divider' },
-    { type: 'header', text: { type: 'plain_text', text: 'Destino' } },
+    { type: 'header', text: { type: 'plain_text', text: '📍 Destino' } },
     channelInput(opts.triggerChannelId),
     assigneesInput(),
     groupsInput(),
@@ -48,7 +48,7 @@ export function createModalView(opts: CreateModalOpts): View {
     rotationInput(),
 
     { type: 'divider' },
-    { type: 'header', text: { type: 'plain_text', text: 'Cuándo' } },
+    { type: 'header', text: { type: 'plain_text', text: '⏰ Cuándo' } },
     dateInput(today),
     timeInput(),
     recurrenceInput(recurrence)
@@ -60,11 +60,11 @@ export function createModalView(opts: CreateModalOpts): View {
   blocks.push(timezoneInput(opts.defaultTimezone));
 
   blocks.push({ type: 'divider' });
-  blocks.push({ type: 'header', text: { type: 'plain_text', text: 'Notificaciones' } });
+  blocks.push({ type: 'header', text: { type: 'plain_text', text: '🔔 Notificaciones' } });
   blocks.push(notifyInput());
 
   blocks.push({ type: 'divider' });
-  blocks.push({ type: 'header', text: { type: 'plain_text', text: 'Tipo de recordatorio' } });
+  blocks.push({ type: 'header', text: { type: 'plain_text', text: '✅ Tipo de recordatorio' } });
   blocks.push(typeInput(reminderType));
 
   if (reminderType === 'task') {
@@ -73,7 +73,7 @@ export function createModalView(opts: CreateModalOpts): View {
   }
 
   blocks.push({ type: 'divider' });
-  blocks.push({ type: 'header', text: { type: 'plain_text', text: 'Botones del recordatorio' } });
+  blocks.push({ type: 'header', text: { type: 'plain_text', text: '🎯 Botones del recordatorio' } });
   blocks.push(actionsInput(actionsSelected));
 
   if (actionsSelected.includes('snooze')) {
@@ -112,7 +112,7 @@ function descInput() {
     block_id: 'desc_block',
     optional: true,
     label: { type: 'plain_text', text: 'Descripción' },
-    hint: { type: 'plain_text', text: 'Sumá contexto, link a doc o el criterio para marcar Done.' },
+    hint: { type: 'plain_text', text: 'Agrega contexto, link a doc o el criterio para marcar Done.' },
     element: {
       type: 'plain_text_input',
       action_id: 'description',
@@ -175,7 +175,7 @@ function emptyAssignmentContext() {
     type: 'context',
     elements: [{
       type: 'mrkdwn',
-      text: '_Si dejás vacío personas y grupos, el recordatorio menciona `@here` (solo gente conectada — nunca `@channel`)._'
+      text: '_Si dejas vacío personas y grupos, el recordatorio menciona `@here` (solo gente conectada — nunca `@channel`)._'
     }]
   } as const;
 }

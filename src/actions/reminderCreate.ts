@@ -98,7 +98,7 @@ export function registerReminderCreate(app: App) {
     } else if (recurrence === 'none') {
       await ack({
         response_action: 'errors',
-        errors: { date_block: 'La fecha y hora ya pasaron. Elegí un momento futuro.' }
+        errors: { date_block: 'La fecha y hora ya pasaron. Elige un momento futuro.' }
       });
       return;
     } else {
