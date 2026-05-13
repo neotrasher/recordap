@@ -59,26 +59,27 @@ export function registerListActions(app: App) {
 
     if (rem.status === 'paused') {
       const now = DateTime.utc();
-      let nextFireAt: string | null;
-      let newStatus: 'active' | 'completed' = 'active';
+      let nextFireAt: string | null = null;
 
       if (rem.recurrence === 'none') {
         // One-shot: si la hora original todavía es futura, restáuralo. Si ya
-        // pasó, no hay nada que disparar — pasa a completed.
+        // pasó, no hay próximo disparo programado — pero la regla puede
+        // seguir activa si hay un fire pending esperando Done (ver abajo).
         const original = rem.next_fire_at
           ? DateTime.fromISO(rem.next_fire_at, { zone: 'utc' })
           : null;
-        if (original && original > now) {
-          nextFireAt = rem.next_fire_at;
-        } else {
-          nextFireAt = null;
-          newStatus = 'completed';
-        }
+        if (original && original > now) nextFireAt = rem.next_fire_at;
       } else {
         const nxt = nextFire(rem, now);
         if (nxt) nextFireAt = nxt.toISO();
-        else { nextFireAt = null; newStatus = 'completed'; }
       }
+
+      // Status final:
+      //   - Hay próximos disparos                    → active.
+      //   - Sin próximos disparos pero con fire pending → active (waiting for Done).
+      //   - Sin próximos disparos y sin fires pending → completed (nada por hacer).
+      const newStatus: 'active' | 'completed' =
+        nextFireAt || reminderService.hasPendingFires(reminderId) ? 'active' : 'completed';
 
       reminderService.resumeReminder(reminderId, newStatus, nextFireAt);
       reminderService.logEvent(reminderId, userId, 'resumed', {

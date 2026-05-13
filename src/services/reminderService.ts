@@ -346,6 +346,11 @@ export const reminderService = {
     return markRuleCompletedStmt.run(reminderId).changes > 0;
   },
 
+  hasPendingFires(reminderId: number): boolean {
+    const r = hasPendingFiresStmt.get(reminderId);
+    return !!(r && r.cnt > 0);
+  },
+
   getDueRepings(nowIso: string): ReminderFire[] {
     return getDueRepingsStmt.all(nowIso);
   },
