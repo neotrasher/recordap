@@ -74,6 +74,12 @@ export async function fire(rem: Reminder, client: WebClient): Promise<void> {
       }
     } catch (err) {
       console.error(`[fire #${fireId}] channel post failed for reminder ${rem.id}:`, (err as Error).message);
+      // Notificar al creator en DM. Una sola vez por fire — no se reintenta
+      // en re-pings (el problema es estructural: hay que invitar al bot al
+      // canal o corregir el reminder).
+      notifyCreatorOfChannelError(client, rem, fireId, err).catch(e => {
+        console.error(`[fire #${fireId}] failed to DM creator about channel error:`, (e as Error).message);
+      });
     }
   }
 
@@ -146,5 +152,54 @@ export async function fire(rem: Reminder, client: WebClient): Promise<void> {
     next_fire_at: newNextFireAt,
     new_status: newStatus,
     dm_recipients: dmTargets.length
+  });
+}
+
+/**
+ * Avisa al creator vía DM cuando el post al canal falló. La causa más común
+ * es `channel_not_found` (bot no invitado al canal). Mensaje accionable para
+ * que sepa exactamente qué hacer.
+ */
+async function notifyCreatorOfChannelError(
+  client: WebClient,
+  rem: Reminder,
+  fireId: number,
+  err: unknown
+): Promise<void> {
+  const code = (err as any)?.data?.error ?? 'unknown';
+
+  let helpMsg: string;
+  switch (code) {
+    case 'channel_not_found':
+    case 'not_in_channel':
+      helpMsg = `El bot no tiene acceso a <#${rem.channel_id}>. Ve a ese canal y ejecuta \`/invite @Recordap\` para que pueda postear.`;
+      break;
+    case 'is_archived':
+      helpMsg = `El canal <#${rem.channel_id}> está archivado. Edita el recordatorio con \`/recordap-list\` y elige otro canal.`;
+      break;
+    case 'restricted_action':
+    case 'msg_too_long':
+      helpMsg = `Slack rechazó el mensaje: \`${code}\`. Probablemente la descripción es muy larga o el canal tiene restricciones.`;
+      break;
+    default:
+      helpMsg = `Slack devolvió un error: \`${code}\`. Revisa la configuración del canal.`;
+  }
+
+  await client.chat.postMessage({
+    channel: rem.creator_slack_id,
+    text: `⚠️ "${rem.title}" no se pudo publicar: ${code}`,
+    blocks: [
+      {
+        type: 'section',
+        text: { type: 'mrkdwn', text: `⚠️ *Recordatorio sin entregar*\n*${rem.title}*` }
+      },
+      {
+        type: 'context',
+        elements: [
+          { type: 'mrkdwn', text: helpMsg },
+          { type: 'mrkdwn', text: `Reminder \`#${rem.id}\` · Fire \`#${fireId}\` · Gestiónalo con \`/recordap-list\`` }
+        ]
+      }
+    ]
   });
 }

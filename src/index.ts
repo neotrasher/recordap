@@ -13,6 +13,15 @@ import { registerModalConditionals } from './actions/modalConditionals';
 import { fireTick } from './jobs/fireTick';
 import { repingTick } from './jobs/repingTick';
 
+// Captura unhandled promise rejections globalmente. El cliente de Slack
+// socket-mode dispara estas a veces durante reconexiones ("server explicit
+// disconnect" en estado "connecting"); el cliente se recupera solo pero deja
+// un stack feo en logs. Sin este handler, PM2 los cuenta como crash potencial.
+process.on('unhandledRejection', (reason) => {
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  console.error('[unhandledRejection]', msg);
+});
+
 async function main() {
   migrate();
 

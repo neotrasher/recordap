@@ -150,6 +150,7 @@ function channelInput(initialChannel?: string) {
     type: 'input',
     block_id: 'channel_block',
     label: { type: 'plain_text', text: 'Canal donde publicar' },
+    hint: { type: 'plain_text', text: 'IMPORTANTE: el bot debe estar invitado al canal. Si no, ejecuta /invite @Recordap desde ahí antes de crear el recordatorio.' },
     element: {
       type: 'conversations_select',
       action_id: 'channel',
