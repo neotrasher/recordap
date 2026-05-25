@@ -4,6 +4,7 @@ import { DateTime } from 'luxon';
 import { reminderService } from '../services/reminderService';
 import { buildDoneMessage, buildReminderMessage } from '../views/reminderMessage';
 import { buildReassignModal } from '../views/reassignModal';
+import { buildCustomSnoozeModal } from '../views/customSnoozeModal';
 import { computeSnoozeTarget, snoozeLabel } from '../services/snoozeService';
 import { slackDate } from '../services/tzService';
 
@@ -76,6 +77,20 @@ export function registerFireActions(app: App) {
     const rem = reminderService.find(fire.reminder_id);
     if (!rem) return;
 
+    // 'custom' abre un modal con datepicker + timepicker. El submission de ese
+    // modal aplica el snooze (ver view handler 'custom_snooze_modal' abajo).
+    if (preset === 'custom') {
+      try {
+        await client.views.open({
+          trigger_id: (body as any).trigger_id,
+          view: buildCustomSnoozeModal(fireId, rem.timezone)
+        });
+      } catch (err) {
+        logger.error({ err }, 'snooze: failed to open custom modal');
+      }
+      return;
+    }
+
     const target = computeSnoozeTarget(preset, rem.timezone);
     if (!target) {
       logger.warn(`snooze: unknown preset ${preset}`);
@@ -100,6 +115,90 @@ export function registerFireActions(app: App) {
       fire_id: fireId,
       preset,
       until: target.toUTC().toISO()
+    });
+  });
+
+  // ── CUSTOM SNOOZE (view submission del modal de fecha personalizada) ────────
+  app.view('custom_snooze_modal', async ({ ack, view, body, client, logger }) => {
+    const fireId = parseInt(view.private_metadata || '0', 10);
+    if (!Number.isFinite(fireId)) {
+      await ack();
+      return;
+    }
+    const userId = (body as any).user.id as string;
+    const values = view.state.values as Record<string, Record<string, any>>;
+    const dateStr = values.date_block?.date?.selected_date as string | undefined;
+    const timeStr = values.time_block?.time?.selected_time as string | undefined;
+
+    if (!dateStr || !timeStr) {
+      await ack({
+        response_action: 'errors',
+        errors: { date_block: 'Selecciona fecha y hora válidas.' }
+      });
+      return;
+    }
+
+    const fire = reminderService.findFire(fireId);
+    if (!fire || fire.status !== 'pending') {
+      await ack({
+        response_action: 'errors',
+        errors: { date_block: 'Este recordatorio ya no está pendiente.' }
+      });
+      return;
+    }
+    const rem = reminderService.find(fire.reminder_id);
+    if (!rem) {
+      await ack();
+      return;
+    }
+
+    const [hh, mm] = timeStr.split(':').map(n => parseInt(n, 10));
+    const chosen = DateTime.fromObject(
+      {
+        year: parseInt(dateStr.slice(0, 4), 10),
+        month: parseInt(dateStr.slice(5, 7), 10),
+        day: parseInt(dateStr.slice(8, 10), 10),
+        hour: hh,
+        minute: mm
+      },
+      { zone: rem.timezone }
+    );
+    if (!chosen.isValid) {
+      await ack({
+        response_action: 'errors',
+        errors: { date_block: `Fecha/hora inválida: ${chosen.invalidReason}` }
+      });
+      return;
+    }
+    if (chosen.toUTC() <= DateTime.utc()) {
+      await ack({
+        response_action: 'errors',
+        errors: { date_block: 'La fecha y hora deben ser futuras.' }
+      });
+      return;
+    }
+
+    await ack();
+
+    const target = chosen.toUTC();
+    reminderService.snoozeFire(fireId, target.toISO()!);
+    reminderService.ackDm(fireId, userId, 'snooze', DateTime.utc().toISO()!);
+
+    const note = `💤 Aplazado por <@${userId}> hasta ${slackDate(target)} (fecha personalizada)`;
+    const updated = buildReminderMessage({
+      rem,
+      fireId,
+      pingCount: fire.ping_count,
+      scheduledFor: DateTime.fromISO(fire.scheduled_for, { zone: 'utc' }),
+      assignedTo: fire.assigned_to_slack_id,
+      note
+    });
+    await updateAllCopies(client, fire.channel_id, fire.channel_ts, fireId, updated, logger);
+
+    reminderService.logEvent(rem.id, userId, 'snoozed', {
+      fire_id: fireId,
+      preset: 'custom',
+      until: target.toISO()
     });
   });
 

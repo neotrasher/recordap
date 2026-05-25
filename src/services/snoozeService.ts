@@ -32,9 +32,10 @@ export function computeSnoozeTarget(preset: string, tz: string): DateTime | null
     }
 
     case 'custom':
-      // fallback: mañana 9am. Para fecha personalizada de verdad haría falta
-      // abrir un datepicker modal, lo dejamos como TODO.
-      return now.plus({ days: 1 }).set({ hour: 9, minute: 0, second: 0, millisecond: 0 });
+      // 'custom' no se computa aquí — el handler de snooze enruta este preset
+      // a un modal con datepicker + timepicker (buildCustomSnoozeModal).
+      // Retornar null deja claro que esta ruta NO aplica el snooze directo.
+      return null;
 
     default:
       return null;

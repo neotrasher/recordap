@@ -92,12 +92,17 @@ export function createModalView(opts: CreateModalOpts): View {
     blocks.push(maxPingsInput(init.maxPings));
   }
 
-  blocks.push({ type: 'divider' });
-  blocks.push({ type: 'header', text: { type: 'plain_text', text: '🎯 Botones del recordatorio' } });
-  blocks.push(actionsInput(actionsSelected));
+  // Sección de botones — sólo aplica a tipo 'task' (un 'ping' no tiene botones).
+  // Cuando type='ping', ocultamos la sección entera para no forzar al usuario a
+  // marcar checkboxes que no se usan en su flujo.
+  if (reminderType === 'task') {
+    blocks.push({ type: 'divider' });
+    blocks.push({ type: 'header', text: { type: 'plain_text', text: '🎯 Botones del recordatorio' } });
+    blocks.push(actionsInput(actionsSelected));
 
-  if (actionsSelected.includes('snooze')) {
-    blocks.push(snoozePresetsInput(init.snoozePresets));
+    if (actionsSelected.includes('snooze')) {
+      blocks.push(snoozePresetsInput(init.snoozePresets));
+    }
   }
 
   return {
