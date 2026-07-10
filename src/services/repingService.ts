@@ -62,13 +62,16 @@ export async function reping(fire: ReminderFire, client: WebClient): Promise<voi
   });
   await updateAllCopies(client, fire.channel_id, fire.channel_ts, fire.id, updatedMain);
 
-  // ── postear nudge nuevo (notifica) en el canal en hilo del original
+  // ── postear nudge nuevo (notifica) SOLO en el hilo del mensaje original
+  // Antes usábamos reply_broadcast:true (aparecía también en el canal), pero
+  // el equipo pidió que sea thread-only para no spamear. Las personas
+  // asignadas siguen recibiendo su DM de re-ping aparte, así que nadie deja
+  // de enterarse — el canal solo deja de recibir el eco.
   if (fire.channel_id && fire.channel_ts) {
     try {
       await client.chat.postMessage({
         channel: fire.channel_id,
         thread_ts: fire.channel_ts,
-        reply_broadcast: true,   // también lo muestra en el canal, no solo en hilo
         text: buildRepingNudge({
           rem,
           pingCount: nextCount,
