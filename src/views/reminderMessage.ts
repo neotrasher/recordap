@@ -74,17 +74,18 @@ export function buildReminderMessage(args: {
   }
   blocks.push({ type: 'context', elements: timingElems });
 
-  // ── Context línea 2: recurrencia + nota opcional (snooze, reassign…) ─────
+  // ── Context línea 2: recurrencia + creador + nota opcional ───────────────
+  // El "Creado por" deja claro a quién pedirle cambios de configuración
+  // (p.ej. habilitar Snooze si no está). Pedido por el equipo.
   const recurNoteElems: any[] = [];
   if (rem.recurrence !== 'none') {
     recurNoteElems.push({ type: 'mrkdwn', text: `🔁 ${recurrenceLabel(rem)}` });
   }
+  recurNoteElems.push({ type: 'mrkdwn', text: `👤 Creado por <@${rem.creator_slack_id}>` });
   if (note) {
     recurNoteElems.push({ type: 'mrkdwn', text: note });
   }
-  if (recurNoteElems.length > 0) {
-    blocks.push({ type: 'context', elements: recurNoteElems });
-  }
+  blocks.push({ type: 'context', elements: recurNoteElems });
 
   // ── Action buttons (only for tasks; ping mode has no follow-up) ───────────
   if (rem.reminder_type === 'task') {
