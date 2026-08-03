@@ -48,7 +48,7 @@ export async function reping(fire: ReminderFire, client: WebClient): Promise<voi
       total_pings: fire.ping_count
     });
 
-    // ── escalación: si hay un líder configurado, avisarle por DM ─────────────
+    // ── escalación: si hay un líder configurado, avisarle por DM + hilo ──────
     if (rem.escalate_to) {
       try {
         await escalateToLead(client, rem, fire);
@@ -58,6 +58,20 @@ export async function reping(fire: ReminderFire, client: WebClient): Promise<voi
         });
       } catch (err) {
         console.error(`[reping] escalation DM failed for fire ${fire.id}:`, (err as Error).message);
+      }
+
+      // Además del DM al líder, avisar en el hilo del mensaje del canal para
+      // que el equipo vea que se escaló (no solo el líder en su DM privado).
+      if (fire.channel_id && fire.channel_ts) {
+        try {
+          await client.chat.postMessage({
+            channel: fire.channel_id,
+            thread_ts: fire.channel_ts,
+            text: `🚨 Tarea no completada tras ${fire.ping_count} recordatorios — escalada a <@${rem.escalate_to}>`
+          });
+        } catch (err) {
+          console.error(`[reping] escalation thread notice failed for fire ${fire.id}:`, (err as Error).message);
+        }
       }
     }
 
