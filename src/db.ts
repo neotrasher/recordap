@@ -10,7 +10,18 @@ export const db = new Database(config.dbPath);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
+// IMPORTANTE: migrar AL CARGAR el módulo, no en main(). Otros módulos
+// (p.ej. reminderService) hacen db.prepare(...) referenciando columnas al
+// importarse — eso corre ANTES que main(). Si la migración corriera después,
+// un prepare contra una columna/tabla que aún no existe tiraría error y el
+// bot no arrancaría. Correr migrate() acá garantiza que el esquema esté
+// completo antes de cualquier prepare. Es idempotente (CREATE IF NOT EXISTS
+// + addColumnIfMissing), así que correrlo siempre es seguro.
+let migrated = false;
+
 export function migrate() {
+  if (migrated) return;
+  migrated = true;
   db.exec(`
     -- The reminder rule (master record)
     CREATE TABLE IF NOT EXISTS reminders (
@@ -122,7 +133,10 @@ function addColumnIfMissing(table: string, column: string, typeDecl: string) {
   }
 }
 
+// Migrar inmediatamente al cargar el módulo. Cualquier otro módulo que importe
+// `db` y prepare statements lo hará DESPUÉS de esto, con el esquema completo.
+migrate();
+
 if (require.main === module) {
-  migrate();
   console.log(`migrated → ${config.dbPath}`);
 }
