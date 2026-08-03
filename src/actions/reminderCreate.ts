@@ -19,6 +19,7 @@ const s   = (v: Values, b: string, a: string): string | undefined => v?.[b]?.[a]
 const d   = (v: Values, b: string, a: string): string | undefined => v?.[b]?.[a]?.selected_date;
 const t   = (v: Values, b: string, a: string): string | undefined => v?.[b]?.[a]?.selected_time;
 const conv= (v: Values, b: string, a: string): string | undefined => v?.[b]?.[a]?.selected_conversation;
+const usr = (v: Values, b: string, a: string): string | undefined => v?.[b]?.[a]?.selected_user ?? undefined;
 const us  = (v: Values, b: string, a: string): string[] => v?.[b]?.[a]?.selected_users ?? [];
 const opt = (v: Values, b: string, a: string): string | undefined => v?.[b]?.[a]?.selected_option?.value;
 const opts= (v: Values, b: string, a: string): string[] =>
@@ -53,6 +54,7 @@ export function registerReminderCreate(app: App) {
     const max_pings      = (opt(v, 'max_pings_block', 'max_pings') as MaxPings) ?? '5';
     const actions        = opts(v, 'actions_block', 'actions');
     const snooze_presets = opts(v, 'snooze_presets_block', 'snooze_presets');
+    const escalate_to    = usr(v, 'escalate_block', 'escalate') ?? null;
 
     // ── validate ────────────────────────────────────────────────────────────
     const errors: Record<string, string> = {};
@@ -142,6 +144,9 @@ export function registerReminderCreate(app: App) {
       allow_snooze:   actions.includes('snooze')   ? 1 : 0,
       allow_reassign: actions.includes('reassign') ? 1 : 0,
       snooze_presets: snooze_presets.length ? snooze_presets : ['15m', '1h', 'tomorrow_9'],
+      // Escalación solo aplica a tipo 'task' (un ping no expira). Si es ping,
+      // ignoramos cualquier valor del campo.
+      escalate_to: reminder_type === 'task' ? escalate_to : null,
       next_fire_at
     } as const;
 

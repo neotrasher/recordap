@@ -1,8 +1,10 @@
 import type { WebClient, ChatUpdateArguments } from '@slack/web-api';
 import { DateTime } from 'luxon';
-import type { ReminderFire } from '../types';
+import type { Reminder, ReminderFire } from '../types';
+import { json } from '../types';
 import { reminderService } from './reminderService';
 import { nextReping } from './recurrenceService';
+import { slackDate } from './tzService';
 import {
   buildReminderMessage,
   buildExpiredMessage,
@@ -45,6 +47,20 @@ export async function reping(fire: ReminderFire, client: WebClient): Promise<voi
       fire_id: fire.id,
       total_pings: fire.ping_count
     });
+
+    // ── escalación: si hay un líder configurado, avisarle por DM ─────────────
+    if (rem.escalate_to) {
+      try {
+        await escalateToLead(client, rem, fire);
+        reminderService.logEvent(rem.id, 'system', 'escalated', {
+          fire_id: fire.id,
+          escalated_to: rem.escalate_to
+        });
+      } catch (err) {
+        console.error(`[reping] escalation DM failed for fire ${fire.id}:`, (err as Error).message);
+      }
+    }
+
     // Si la regla está active sin más disparos y este era el último pending, completa.
     if (reminderService.maybeCompleteRule(rem.id)) {
       reminderService.logEvent(rem.id, 'system', 'auto_completed', { trigger: 'last_fire_expired' });
@@ -142,4 +158,62 @@ async function updateAllCopies(
     try { await update(dm.dm_channel, dm.dm_ts); }
     catch (err) { console.error(`[reping] DM update failed for ${dm.slack_user_id} (fire ${fireId}):`, (err as Error).message); }
   }
+}
+
+/**
+ * DM de escalación al líder configurado cuando un recordatorio expira sin que
+ * nadie lo marque Hecho. Incluye link al mensaje del canal si existe.
+ */
+async function escalateToLead(client: WebClient, rem: Reminder, fire: ReminderFire): Promise<void> {
+  const assignees = json.parse<string[]>(rem.assignees, []);
+  const groups = json.parse<string[]>(rem.groups, []);
+  const whoStr = [
+    ...assignees.map(u => `<@${u}>`),
+    ...groups.map(g => `<!subteam^${g}>`)
+  ].join(' ') || '_@here_';
+
+  // Link permanente al mensaje del canal, si lo tenemos.
+  let channelLink = '';
+  if (fire.channel_id && fire.channel_ts) {
+    try {
+      const permalink = await client.chat.getPermalink({
+        channel: fire.channel_id,
+        message_ts: fire.channel_ts
+      });
+      if (permalink.permalink) channelLink = `<${permalink.permalink}|Ver en el canal>`;
+    } catch { /* permalink es best-effort */ }
+  }
+
+  const conv = await client.conversations.open({ users: rem.escalate_to! });
+  const dmChannel = conv.channel?.id;
+  if (!dmChannel) return;
+
+  const contextParts: string[] = [
+    `Canal: <#${rem.channel_id}>`,
+    `Asignados: ${whoStr}`,
+    `Creado por: <@${rem.creator_slack_id}>`
+  ];
+  if (channelLink) contextParts.push(channelLink);
+
+  await client.chat.postMessage({
+    channel: dmChannel,
+    text: `🚨 Escalación: "${rem.title}" no se completó`,
+    blocks: [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `🚨 *Recordatorio sin completar*\n*${escapeMd(rem.title)}* agotó sus ${fire.ping_count} avisos y nadie marcó Hecho.`
+        }
+      },
+      {
+        type: 'context',
+        elements: contextParts.map(text => ({ type: 'mrkdwn', text }))
+      }
+    ]
+  });
+}
+
+function escapeMd(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

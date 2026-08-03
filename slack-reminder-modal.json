@@ -329,6 +329,18 @@
         ]
       }
     },
+    {
+      "type": "input",
+      "block_id": "escalate_block",
+      "optional": true,
+      "label": { "type": "plain_text", "text": "Avisar a un líder si no se completa" },
+      "hint": { "type": "plain_text", "text": "Si el recordatorio agota sus avisos sin que nadie marque Done, esta persona recibe un DM. Deja vacío para no escalar." },
+      "element": {
+        "type": "users_select",
+        "action_id": "escalate",
+        "placeholder": { "type": "plain_text", "text": "Selecciona un líder (opcional)" }
+      }
+    },
 
     { "type": "divider" },
     {

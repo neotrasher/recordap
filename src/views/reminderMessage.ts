@@ -82,6 +82,9 @@ export function buildReminderMessage(args: {
     recurNoteElems.push({ type: 'mrkdwn', text: `🔁 ${recurrenceLabel(rem)}` });
   }
   recurNoteElems.push({ type: 'mrkdwn', text: `👤 Creado por <@${rem.creator_slack_id}>` });
+  if (rem.reminder_type === 'task' && rem.escalate_to) {
+    recurNoteElems.push({ type: 'mrkdwn', text: `🚨 Escala a <@${rem.escalate_to}> si no se completa` });
+  }
   if (note) {
     recurNoteElems.push({ type: 'mrkdwn', text: note });
   }

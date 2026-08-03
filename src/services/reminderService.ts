@@ -38,6 +38,8 @@ export interface CreateReminderInput {
   allow_reassign: 0 | 1;
   snooze_presets: string[];
 
+  escalate_to: string | null;           // slack user id o null
+
   next_fire_at: string;                 // UTC ISO
 }
 
@@ -50,6 +52,7 @@ const createStmt = db.prepare(`
     reminder_type, reping_every, max_pings,
     notify_channel, notify_dm, notify_only_turn,
     allow_done, allow_snooze, allow_reassign, snooze_presets,
+    escalate_to,
     next_fire_at
   ) VALUES (
     @creator_slack_id, @title, @description, @channel_id,
@@ -59,6 +62,7 @@ const createStmt = db.prepare(`
     @reminder_type, @reping_every, @max_pings,
     @notify_channel, @notify_dm, @notify_only_turn,
     @allow_done, @allow_snooze, @allow_reassign, @snooze_presets_json,
+    @escalate_to,
     @next_fire_at
   )
 `);
@@ -180,6 +184,7 @@ const updateReminderStmt = db.prepare(`
     allow_snooze      = @allow_snooze,
     allow_reassign    = @allow_reassign,
     snooze_presets    = @snooze_presets_json,
+    escalate_to       = @escalate_to,
     next_fire_at      = @next_fire_at,
     updated_at        = datetime('now')
   WHERE id = @id

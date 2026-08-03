@@ -31,6 +31,7 @@ interface CreateModalOpts {
     repingEvery?: RepingEvery;
     maxPings?: MaxPings;
     snoozePresets?: string[];
+    escalateTo?: string | null;
   };
 }
 
@@ -90,6 +91,7 @@ export function createModalView(opts: CreateModalOpts): View {
   if (reminderType === 'task') {
     blocks.push(repingInput(init.repingEvery));
     blocks.push(maxPingsInput(init.maxPings));
+    blocks.push(escalateInput(init.escalateTo));
   }
 
   // Sección de botones — sólo aplica a tipo 'task' (un 'ping' no tiene botones).
@@ -443,6 +445,22 @@ function maxPingsInput(initial?: MaxPings) {
       action_id: 'max_pings',
       initial_option: initialOpt,
       options
+    }
+  } as const;
+}
+
+function escalateInput(initial?: string | null) {
+  return {
+    type: 'input',
+    block_id: 'escalate_block',
+    optional: true,
+    label: { type: 'plain_text', text: 'Avisar a un líder si no se completa' },
+    hint: { type: 'plain_text', text: 'Si el recordatorio agota sus avisos sin que nadie marque Done, esta persona recibe un DM. Dejá vacío para no escalar.' },
+    element: {
+      type: 'users_select',
+      action_id: 'escalate',
+      placeholder: { type: 'plain_text', text: 'Selecciona un líder (opcional)' },
+      ...(initial ? { initial_user: initial } : {})
     }
   } as const;
 }

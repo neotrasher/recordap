@@ -49,6 +49,8 @@ export function migrate() {
       next_fire_at      TEXT,
       fires_count       INTEGER NOT NULL DEFAULT 0,
 
+      escalate_to       TEXT,   -- slack user id a quien avisar si el fire expira sin Done
+
       created_at        TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -101,6 +103,23 @@ export function migrate() {
     );
     CREATE INDEX IF NOT EXISTS idx_events_reminder ON reminder_events(reminder_id, ts);
   `);
+
+  // ── Migraciones incrementales para DBs que ya existían ────────────────────
+  // CREATE TABLE IF NOT EXISTS no agrega columnas nuevas a una tabla existente.
+  // addColumnIfMissing es idempotente: solo aplica el ALTER si la columna falta.
+  addColumnIfMissing('reminders', 'escalate_to', 'TEXT');
+}
+
+/**
+ * Agrega una columna a una tabla si todavía no existe. Seguro de correr en
+ * cada arranque (no falla si la columna ya está).
+ */
+function addColumnIfMissing(table: string, column: string, typeDecl: string) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (!cols.some(c => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${typeDecl}`);
+    console.log(`[migrate] added column ${table}.${column}`);
+  }
 }
 
 if (require.main === module) {

@@ -44,6 +44,8 @@ export interface Reminder {
   next_fire_at: string | null;
   fires_count: number;
 
+  escalate_to: string | null;   // slack user id a avisar si el fire expira sin Done
+
   created_at: string;
   updated_at: string;
 }

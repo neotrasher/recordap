@@ -95,7 +95,8 @@ export function registerEditReminder(app: App) {
             notify,
             repingEvery: rem.reping_every as RepingEvery,
             maxPings: rem.max_pings as MaxPings,
-            snoozePresets: json.parse<string[]>(rem.snooze_presets, [])
+            snoozePresets: json.parse<string[]>(rem.snooze_presets, []),
+            escalateTo: rem.escalate_to
           }
         })
       });

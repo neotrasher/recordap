@@ -34,6 +34,14 @@ export function registerModalConditionals(app: App) {
     const timezone        = opt(v, 'timezone_block', 'timezone') ?? config.defaultTimezone;
     const channel         = conv(v, 'channel_block', 'channel') || undefined;
 
+    // Preservar modo edición: si el modal se abrió para editar, private_metadata
+    // lleva el reminder_id. Sin esto, cambiar tipo/recurrencia mientras editas
+    // convertiría el modal en "crear nuevo" al hacer submit.
+    const editingId = view.private_metadata
+      ? parseInt(view.private_metadata, 10)
+      : NaN;
+    const editingReminderId = Number.isFinite(editingId) ? editingId : undefined;
+
     try {
       await client.views.update({
         view_id: view.id,
@@ -43,7 +51,8 @@ export function registerModalConditionals(app: App) {
           triggerChannelId: channel,
           recurrence,
           reminderType,
-          actionsSelected
+          actionsSelected,
+          editingReminderId
         })
       });
     } catch (err) {
