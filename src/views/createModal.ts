@@ -489,7 +489,11 @@ function snoozePresetsInput(initial?: string[]) {
   const opt = (v: string, t: string) => ({ text: { type: 'plain_text' as const, text: t }, value: v });
   const options = [
     opt('15m', '15 minutos'),
+    opt('30m', '30 minutos'),
     opt('1h', '1 hora'),
+    opt('2h', '2 horas'),
+    opt('3h', '3 horas'),
+    opt('6h', '6 horas'),
     opt('today_16', 'Esta tarde 4pm'),
     opt('tomorrow_9', 'Mañana 9am'),
     opt('next_monday_9', 'Próximo lunes 9am'),
@@ -497,7 +501,7 @@ function snoozePresetsInput(initial?: string[]) {
   ];
   const initialOptions = initial
     ? options.filter(o => initial.includes(o.value))
-    : options.filter(o => ['15m', '1h', 'tomorrow_9'].includes(o.value));
+    : options.filter(o => ['15m', '1h', '3h', 'tomorrow_9'].includes(o.value));
   return {
     type: 'input',
     block_id: 'snooze_presets_block',

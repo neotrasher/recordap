@@ -378,11 +378,16 @@
         "initial_options": [
           { "text": { "type": "plain_text", "text": "15 minutos" }, "value": "15m" },
           { "text": { "type": "plain_text", "text": "1 hora" }, "value": "1h" },
+          { "text": { "type": "plain_text", "text": "3 horas" }, "value": "3h" },
           { "text": { "type": "plain_text", "text": "Mañana 9am" }, "value": "tomorrow_9" }
         ],
         "options": [
           { "text": { "type": "plain_text", "text": "15 minutos" }, "value": "15m" },
+          { "text": { "type": "plain_text", "text": "30 minutos" }, "value": "30m" },
           { "text": { "type": "plain_text", "text": "1 hora" }, "value": "1h" },
+          { "text": { "type": "plain_text", "text": "2 horas" }, "value": "2h" },
+          { "text": { "type": "plain_text", "text": "3 horas" }, "value": "3h" },
+          { "text": { "type": "plain_text", "text": "6 horas" }, "value": "6h" },
           { "text": { "type": "plain_text", "text": "Esta tarde 4pm" }, "value": "today_16" },
           { "text": { "type": "plain_text", "text": "Mañana 9am" }, "value": "tomorrow_9" },
           { "text": { "type": "plain_text", "text": "Próximo lunes 9am" }, "value": "next_monday_9" },

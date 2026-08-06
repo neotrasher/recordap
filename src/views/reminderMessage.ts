@@ -266,7 +266,11 @@ function stripMentions(s: string): string {
 function snoozeLabel(preset: string): string {
   switch (preset) {
     case '15m':            return '⏱️ 15 minutos';
+    case '30m':            return '⏱️ 30 minutos';
     case '1h':             return '⏱️ 1 hora';
+    case '2h':             return '⏱️ 2 horas';
+    case '3h':             return '⏱️ 3 horas';
+    case '6h':             return '⏱️ 6 horas';
     case 'today_16':       return '☕ Esta tarde 4pm';
     case 'tomorrow_9':     return '🌅 Mañana 9am';
     case 'next_monday_9':  return '📅 Próximo lunes 9am';

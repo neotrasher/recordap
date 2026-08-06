@@ -13,8 +13,20 @@ export function computeSnoozeTarget(preset: string, tz: string): DateTime | null
     case '15m':
       return now.plus({ minutes: 15 });
 
+    case '30m':
+      return now.plus({ minutes: 30 });
+
     case '1h':
       return now.plus({ hours: 1 });
+
+    case '2h':
+      return now.plus({ hours: 2 });
+
+    case '3h':
+      return now.plus({ hours: 3 });
+
+    case '6h':
+      return now.plus({ hours: 6 });
 
     case 'today_16': {
       const target = now.set({ hour: 16, minute: 0, second: 0, millisecond: 0 });
@@ -45,7 +57,11 @@ export function computeSnoozeTarget(preset: string, tz: string): DateTime | null
 export function snoozeLabel(preset: string): string {
   switch (preset) {
     case '15m':            return '15 minutos';
+    case '30m':            return '30 minutos';
     case '1h':             return '1 hora';
+    case '2h':             return '2 horas';
+    case '3h':             return '3 horas';
+    case '6h':             return '6 horas';
     case 'today_16':       return 'esta tarde 4pm';
     case 'tomorrow_9':     return 'mañana 9am';
     case 'next_monday_9':  return 'próximo lunes 9am';
