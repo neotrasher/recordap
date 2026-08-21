@@ -66,6 +66,10 @@ export function registerReminderCreate(app: App) {
     if (!timezone)                               errors.timezone_block   = 'Selecciona una zona horaria.';
     if (recurrence === 'weekly' && !weekdays.length)
                                                  errors.weekdays_block   = 'Elige al menos un día.';
+    // El menú de snooze en el mensaje es un overflow de Slack, que acepta como
+    // máximo 5 opciones. Si eligen más, el mensaje sería inválido al dispararse.
+    if (actions.includes('snooze') && snooze_presets.length > 5)
+                                                 errors.snooze_presets_block = 'Máximo 5 opciones de snooze (límite de Slack). Deselecciona algunas.';
     if (Object.keys(errors).length) {
       await ack({ response_action: 'errors', errors });
       return;

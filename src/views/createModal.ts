@@ -507,7 +507,7 @@ function snoozePresetsInput(initial?: string[]) {
     block_id: 'snooze_presets_block',
     optional: true,
     label: { type: 'plain_text', text: 'Opciones rápidas de snooze' },
-    hint: { type: 'plain_text', text: 'Solo si tienes «Snooze» activado arriba.' },
+    hint: { type: 'plain_text', text: 'Solo si tienes «Snooze» activado arriba. Máximo 5 opciones.' },
     element: {
       type: 'checkboxes',
       action_id: 'snooze_presets',

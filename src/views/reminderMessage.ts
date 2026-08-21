@@ -105,7 +105,10 @@ export function buildReminderMessage(args: {
     }
 
     if (rem.allow_snooze) {
-      const presets = json.parse<string[]>(rem.snooze_presets, ['15m', '1h', 'tomorrow_9']);
+      // El overflow de Slack acepta MÁXIMO 5 opciones. Si el recordatorio tiene
+      // más presets guardados, recortamos a los primeros 5 — de lo contrario
+      // Slack rechaza todo el mensaje con 'invalid_blocks' y el post falla.
+      const presets = json.parse<string[]>(rem.snooze_presets, ['15m', '1h', 'tomorrow_9']).slice(0, 5);
       if (presets.length > 0) {
         elements.push({
           type: 'overflow',
